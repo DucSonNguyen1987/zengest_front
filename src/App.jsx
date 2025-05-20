@@ -4,6 +4,8 @@ import { ConfigProvider } from 'antd';
 import frFR from 'antd/lib/locale/fr_FR'; // Support du français pour Ant Design
 import { AuthProvider } from './context/AuthContext';
 import routes from './config/routes.jsx';
+import { Provider } from 'react-redux';
+import store from './store';
 
 // Composant qui utilise useRoutes pour générer les routes
 const AppRoutes = () => {
@@ -13,6 +15,7 @@ const AppRoutes = () => {
 
 function App() {
   return (
+    <Provider store={store}> {/* Ajoutez le Provider Redux ici */}
     <ConfigProvider locale={frFR}> {/* Configuration globale d'Ant Design */}
       <BrowserRouter> {/* Fournit le routage */}
         <AuthProvider> {/* Fournit le contexte d'authentification */}
@@ -20,6 +23,7 @@ function App() {
         </AuthProvider>
       </BrowserRouter>
     </ConfigProvider>
+    </Provider>
   );
 }
 

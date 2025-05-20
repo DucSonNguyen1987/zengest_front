@@ -89,7 +89,7 @@ const DashboardLayout = () => {
         {/* Logo */}
         <div className="logo" style={{ height: 64, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <h2 style={{ color: 'white', margin: 0 }}>
-            {collapsed ? 'RESTO' : 'RESTAURANT APP'}
+            {collapsed ? 'ZG' : 'ZENGEST'}
           </h2>
         </div>
         
@@ -115,8 +115,8 @@ const DashboardLayout = () => {
               
               {/* Plan de salle - visible selon les permissions */}
               {hasPermission(user?.role, 'VIEW_TABLE_STATUS') && (
-                <Menu.Item key="/floor-plan" icon={<TableOutlined />}>
-                  <Link to="/floor-plan">Plan de salle</Link>
+                <Menu.Item key="/floor-plans" icon={<TableOutlined />}>
+                  <Link to="/floor-plans">Plan de salle</Link>
                 </Menu.Item>
               )}
               

@@ -6,6 +6,10 @@ import Login from '../pages/auth/Login';
 import Register from '../pages/auth/Register';
 import Dashboard from '../pages/dashboard/Dashboard';
 import NotFound from '../pages/errors/NotFound';
+import FloorPlanManagement from '../pages/floorPlan/FloorPlanManagement';
+
+import ProtectedRoute from '../components/auth/ProtectedRoute';
+import { ROLES } from '../utils/permissions';
 
 // Configuration minimale des routes - à adapter selon vos besoins
 const routes = [
@@ -29,11 +33,21 @@ const routes = [
   },
   {
     path: '/',
-    element: <DashboardLayout />,
+    element: (
+        <DashboardLayout />
+    ),
     children: [
       {
         path: 'dashboard',
         element: <Dashboard />,
+      },
+      {
+        path: 'floor-plans',
+        element: (
+          <ProtectedRoute requiredRole={ROLES.MANAGER}>
+            <FloorPlanManagement />
+          </ProtectedRoute>
+        ),
       },
     ],
   },
