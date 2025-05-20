@@ -1,10 +1,10 @@
 import React from 'react';
-import { Form, Input, Button, Checkbox, Typogrphy } from 'antd';
+import { Form, Input, Button, Checkbox, Typography } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
 
-const { Title } = Typogrphy;
+const { Title } = Typography;
 
 
 const LoginForm = () => {

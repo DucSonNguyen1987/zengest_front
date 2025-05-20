@@ -1,4 +1,4 @@
-import jwtDecode from 'jwt-decode';
+import {jwtDecode} from 'jwt-decode';
 
 // Récupérer le token depuis le localStorage
 export const getToken = () => {

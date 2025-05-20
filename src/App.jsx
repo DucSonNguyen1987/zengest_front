@@ -3,7 +3,7 @@ import { BrowserRouter, useRoutes } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import frFR from 'antd/lib/locale/fr_FR'; // Support du français pour Ant Design
 import { AuthProvider } from './context/AuthContext';
-import routes from './config/routes';
+import routes from './config/routes.jsx';
 
 // Composant qui utilise useRoutes pour générer les routes
 const AppRoutes = () => {
