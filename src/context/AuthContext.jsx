@@ -5,9 +5,10 @@
 // src/context/AuthContext.jsx - Version corrigée utilisant getToken de manière cohérente
 import React, { createContext, useState, useEffect } from 'react';
 import { getCurrentUser, loginUser, registerUser } from '../api/auth';
-import {  isTokenValid, removeToken, setToken } from '../utils/token';
+import {  getToken, isTokenValid, removeToken, setToken } from '../utils/token';
 import { message } from 'antd';
 import { ROLES } from '../utils/permissions';
+import {Alert, Snackbar} from '@mui/material';
 
 export const AuthContext = createContext();
 
@@ -15,6 +16,19 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [snackbar, setSnackbar] = useState({open: false, message: '', severity:'success'});
+
+
+  // Fonction pour afficher les messages
+  const showMessage = (message, severity = 'success') => {
+    setSnackbar ({open: true, message, severity});
+  };
+
+  // Fermeture du snackbar
+  const handleCloseSnackbar = () => {
+    setSnackbar({...snackbar, open: false});
+  };
+  
 
   // Initialisation: vérifier si l'utilisateur est déjà connecté
   useEffect(() => {
@@ -127,8 +141,29 @@ export const AuthProvider = ({ children }) => {
     register,
     isAuthenticated: !!user,
     getStaffType,
-    isStaff
+    isStaff,
+    showMessage,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>
+  {children}
+  <Snackbar
+  open={snackbar.open}
+  autoHideDuration={6000}
+  onClose={handleCloseSnackbar}
+  anchorOrigin={{vertical: 'bottom', horizontal: 'right'}}
+  >
+    <Alert
+    onClose={handleCloseSnackbar}
+    severity={snackbar.severity}
+    sx={{
+      backdropFilter: 'blur(10px)',
+            backgroundColor: 'rgba(240, 240, 242, 0.8)',
+            borderRadius: '12px'
+    }}
+    >
+      {snackbar.message}
+    </Alert>
+  </Snackbar>
+  </AuthContext.Provider>;
 };

@@ -1,246 +1,793 @@
-import React, { useState } from 'react';
-import { Layout, Menu, Avatar, Dropdown, Button, Badge } from 'antd';
-import {
-  UserOutlined,
-  MenuUnfoldOutlined,
-  MenuFoldOutlined,
-  DashboardOutlined,
-  TeamOutlined,
-  SettingOutlined,
-  LogoutOutlined,
-  BellOutlined,
-  TableOutlined,
-  ShoppingCartOutlined,
-  ClockCircleOutlined,
-  FileTextOutlined,
-  HomeOutlined,
-  CoffeeOutlined,
-  ShopOutlined
-} from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { 
+  Box, 
+  AppBar, 
+  Toolbar, 
+  Drawer, 
+  List, 
+  ListItem,
+  ListItemButton, 
+  ListItemIcon, 
+  ListItemText, 
+  IconButton, 
+  Typography, 
+  Avatar, 
+  Badge, 
+  Menu, 
+  MenuItem, 
+  Divider, 
+  Tooltip, 
+  Collapse, 
+  
+  useMediaQuery
+} from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
+
+// Material Icons
+import MenuIcon from '@mui/icons-material/Menu';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import PeopleIcon from '@mui/icons-material/People';
+import SettingsIcon from '@mui/icons-material/Settings';
+import LogoutIcon from '@mui/icons-material/Logout';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import TableRestaurantIcon from '@mui/icons-material/TableRestaurant';
+import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import HomeIcon from '@mui/icons-material/Home';
+import LocalCafeIcon from '@mui/icons-material/LocalCafe';
+import StorefrontIcon from '@mui/icons-material/Storefront';
+import PersonIcon from '@mui/icons-material/Person';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
+
+// Import des hooks et utilitaires existants
 import { useAuth } from '../hooks/useAuth';
 import { hasPermission, ROLES } from '../utils/permissions';
+import { useColorMode } from '../context/ThemeContext'; // Supposons que ce contexte est déjà créé
 
-const { Header, Sider, Content } = Layout;
-const { SubMenu } = Menu;
+// Largeur du drawer
+const drawerWidth = 250;
 
 const DashboardLayout = () => {
-  // État pour la sidebar repliable
-  const [collapsed, setCollapsed] = useState(false);
-  // Récupération des données utilisateur et fonction de déconnexion
-  const { user, logout, getStaffType, isStaff } = useAuth();
+  // État pour le drawer
+  const [open, setOpen] = useState(true);
+  
+  // États pour les menus dropdown
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState(null);
+  
+  // État pour les sous-menus
+  const [subMenuOpen, setSubMenuOpen] = useState({
+    restaurant: true,
+    admin: false
+  });
+
+  // Accès au thème et au mode de couleur
+  const theme = useTheme();
+  const { mode, toggleColorMode } = useColorMode();
+  const isDark = mode === 'dark';
+  
+  // Détection de la taille d'écran
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
+  
+  // Hooks de routing
   const navigate = useNavigate();
   const location = useLocation();
   
+  // Données d'authentification
+  const { user, logout, getStaffType, isStaff } = useAuth();
   const staffType = getStaffType();
 
-  // Fonction pour gérer la déconnexion
+  // Fermeture automatique sur petit écran
+  useEffect(() => {
+    if (isSmallScreen) {
+      setOpen(false);
+    } else {
+      setOpen(true);
+    }
+  }, [isSmallScreen]);
+
+  // Gestionnaires d'événements pour les menus et sous-menus
+  const handleDrawerToggle = () => {
+    setOpen(!open);
+  };
+
+  const handleUserMenuOpen = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleUserMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleNotificationMenuOpen = (event) => {
+    setNotificationAnchorEl(event.currentTarget);
+  };
+
+  const handleNotificationMenuClose = () => {
+    setNotificationAnchorEl(null);
+  };
+
+  const handleSubMenuToggle = (menuId) => {
+    setSubMenuOpen(prev => ({
+      ...prev,
+      [menuId]: !prev[menuId]
+    }));
+  };
+
   const handleLogout = () => {
+    handleUserMenuClose();
     logout();
     navigate('/login');
   };
 
-  // Menu déroulant du profil utilisateur
-  const userMenu = (
-    <Menu>
-      <Menu.Item key="1" icon={<UserOutlined />}>
-        <Link to="/profile">Mon profil</Link>
-      </Menu.Item>
-      {hasPermission(user?.role, 'EDIT_SETTINGS') && (
-        <Menu.Item key="2" icon={<SettingOutlined />}>
-          <Link to="/settings">Paramètres</Link>
-        </Menu.Item>
-      )}
-      <Menu.Divider />
-      <Menu.Item key="3" icon={<LogoutOutlined />} onClick={handleLogout}>
-        Déconnexion
-      </Menu.Item>
-    </Menu>
-  );
-
-  // Détermine si une icône spécifique doit être affichée pour le staff
+  // Fonction pour obtenir l'icône de staff appropriée
   const getStaffIcon = () => {
-    if (!staffType) return <UserOutlined />;
+    if (!staffType) return <PersonIcon />;
     
     switch(staffType) {
       case 'bar':
-        return <CoffeeOutlined />;
+        return <LocalCafeIcon />;
       case 'floor':
-        return <ShopOutlined />;
+        return <StorefrontIcon />;
       case 'kitchen':
-        return <ShoppingCartOutlined />;
+        return <ShoppingCartIcon />;
       default:
-        return <UserOutlined />;
+        return <PersonIcon />;
     }
   };
 
+  // Fonction pour vérifier si un chemin est actif
+  const isPathActive = (path) => {
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
+
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      {/* Sidebar avec menu principal */}
-      <Sider 
-        trigger={null} 
-        collapsible 
-        collapsed={collapsed}
-        // Configuration responsive
-        breakpoint="lg"
-        collapsedWidth="80"
-        width={250}
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      {/* AppBar */}
+      <AppBar
+        position="fixed"
+        sx={{
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+          background: isDark 
+            ? alpha(theme.palette.background.paper, 0.7)
+            : alpha(theme.palette.background.paper, 0.8),
+          backdropFilter: 'blur(10px)',
+          boxShadow: `0 4px 20px ${alpha(isDark ? '#000' : theme.palette.primary.dark, 0.1)}`,
+          color: theme.palette.text.primary,
+          borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          transition: theme.transitions.create(['width', 'margin'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.leavingScreen,
+          }),
+          ...(open && !isSmallScreen && {
+            width: `calc(100% - ${drawerWidth}px)`,
+            marginLeft: `${drawerWidth}px`,
+            transition: theme.transitions.create(['width', 'margin'], {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.enteringScreen,
+            }),
+          }),
+        }}
       >
-        {/* Logo */}
-        <div className="logo" style={{ height: 64, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <h2 style={{ color: 'white', margin: 0 }}>
-            {collapsed ? 'ZG' : 'ZENGEST'}
-          </h2>
-        </div>
-        
-        {/* Menu principal avec items conditionnels selon les permissions */}
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={[location.pathname]}
-          defaultOpenKeys={['restaurant']}
+        <Toolbar>
+          {/* Bouton du drawer */}
+          <IconButton
+            edge="start"
+            color="inherit"
+            aria-label="open drawer"
+            onClick={handleDrawerToggle}
+            sx={{ 
+              mr: 2,
+              ...(open && !isSmallScreen && { display: 'none' }) 
+            }}
+          >
+            <MenuIcon />
+          </IconButton>
+          
+          {/* Titre */}
+          <Typography 
+            variant="h6" 
+            noWrap 
+            component="div" 
+            sx={{ 
+              flexGrow: 1,
+              fontWeight: 500
+            }}
+          >
+            ZENGEST
+          </Typography>
+          
+          {/* Bouton de notifications */}
+          <Tooltip title="Notifications">
+            <IconButton 
+              color="inherit" 
+              sx={{ mr: 1 }}
+              onClick={handleNotificationMenuOpen}
+            >
+              <Badge badgeContent={5} color="primary">
+                <NotificationsIcon />
+              </Badge>
+            </IconButton>
+          </Tooltip>
+          
+          {/* Menu notifications */}
+          <Menu
+            anchorEl={notificationAnchorEl}
+            open={Boolean(notificationAnchorEl)}
+            onClose={handleNotificationMenuClose}
+            PaperProps={{
+              sx: {
+                background: alpha(theme.palette.background.paper, 0.9),
+                backdropFilter: 'blur(10px)',
+                borderRadius: 2,
+                boxShadow: `0 8px 32px 0 ${alpha(isDark ? '#000' : theme.palette.primary.dark, 0.1)}`,
+                border: `1px solid ${alpha(isDark ? theme.palette.divider : theme.palette.background.paper, 0.5)}`,
+                width: 320,
+                maxHeight: 400,
+              }
+            }}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          >
+            <Typography sx={{ p: 2, fontWeight: 500 }}>Notifications</Typography>
+            <Divider />
+            
+            {/* Liste des notifications */}
+            {[1, 2, 3, 4, 5].map((notification) => (
+              <MenuItem key={notification} onClick={handleNotificationMenuClose}>
+                <Typography variant="body2">Notification {notification}</Typography>
+              </MenuItem>
+            ))}
+          </Menu>
+          
+          {/* Toggle du thème */}
+          <Tooltip title={isDark ? "Mode clair" : "Mode sombre"}>
+            <IconButton onClick={toggleColorMode} color="inherit" sx={{ ml: 1 }}>
+              {isDark ? <Brightness7Icon /> : <Brightness4Icon />}
+            </IconButton>
+          </Tooltip>
+          
+          {/* Avatar utilisateur */}
+          <Tooltip title="Profil">
+            <IconButton
+              onClick={handleUserMenuOpen}
+              color="inherit"
+              size="small"
+              sx={{ ml: 1 }}
+            >
+              <Avatar 
+                sx={{ 
+                  width: 38, 
+                  height: 38,
+                  background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
+                }}
+              >
+                {getStaffIcon()}
+              </Avatar>
+            </IconButton>
+          </Tooltip>
+          
+          {/* Menu utilisateur */}
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={handleUserMenuClose}
+            PaperProps={{
+              sx: {
+                background: alpha(theme.palette.background.paper, 0.9),
+                backdropFilter: 'blur(10px)',
+                borderRadius: 2,
+                boxShadow: `0 8px 32px 0 ${alpha(isDark ? '#000' : theme.palette.primary.dark, 0.1)}`,
+                border: `1px solid ${alpha(isDark ? theme.palette.divider : theme.palette.background.paper, 0.5)}`,
+                minWidth: 180,
+              }
+            }}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          >
+            {/* Informations utilisateur */}
+            <Box sx={{ px: 2, py: 1.5 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'medium' }}>
+                {user?.firstName} {user?.lastName}
+                {isStaff() && ` (${staffType.toUpperCase()})`}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {user?.email}
+              </Typography>
+              <Typography variant="caption" sx={{ 
+                display: 'inline-block', 
+                mt: 1, 
+                px: 1, 
+                py: 0.5, 
+                borderRadius: 1,
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                color: theme.palette.primary.main
+              }}>
+                {user?.role}
+              </Typography>
+            </Box>
+            
+            <Divider />
+            
+            {/* Options du menu */}
+            <MenuItem component={Link} to="/profile" onClick={handleUserMenuClose}>
+              <ListItemIcon>
+                <PersonIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText primary="Mon profil" />
+            </MenuItem>
+            
+            {hasPermission(user?.role, 'EDIT_SETTINGS') && (
+              <MenuItem component={Link} to="/settings" onClick={handleUserMenuClose}>
+                <ListItemIcon>
+                  <SettingsIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText primary="Paramètres" />
+              </MenuItem>
+            )}
+            
+            <Divider />
+            
+            {/* Option de déconnexion */}
+            <MenuItem onClick={handleLogout}>
+              <ListItemIcon>
+                <LogoutIcon fontSize="small" sx={{ color: theme.palette.error.main }} />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Déconnexion" 
+                primaryTypographyProps={{ 
+                  color: theme.palette.error.main 
+                }} 
+              />
+            </MenuItem>
+          </Menu>
+        </Toolbar>
+      </AppBar>
+      
+      {/* Drawer - Menu latéral */}
+      <Drawer
+        variant={isSmallScreen ? 'temporary' : 'permanent'}
+        open={open}
+        onClose={isSmallScreen ? handleDrawerToggle : undefined}
+        sx={{
+          width: drawerWidth,
+          flexShrink: 0,
+          '& .MuiDrawer-paper': {
+            width: drawerWidth,
+            boxSizing: 'border-box',
+            background: isDark 
+              ? alpha(theme.palette.background.paper, 0.7)
+              : alpha(theme.palette.background.paper, 0.8),
+            backdropFilter: 'blur(10px)',
+            borderRight: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          },
+        }}
+      >
+        {/* En-tête du drawer */}
+        <Toolbar
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            px: [2],
+            py: 1.5,
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+          }}
         >
-          {/* Tableau de bord (accessible à tous) */}
-          <Menu.Item key="/dashboard" icon={<DashboardOutlined />}>
-            <Link to="/dashboard">Tableau de bord</Link>
-          </Menu.Item>
+          {/* Logo */}
+          <Typography 
+            variant="h5" 
+            component="div" 
+            sx={{ 
+              fontWeight: 'bold',
+              background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              color: 'transparent'
+            }}
+          >
+            ZENGEST
+          </Typography>
+          
+          {/* Bouton pour fermer le drawer */}
+          {!isSmallScreen && (
+            <IconButton onClick={handleDrawerToggle}>
+              <ChevronLeftIcon />
+            </IconButton>
+          )}
+        </Toolbar>
+        
+        <Divider />
+        
+        {/* Navigation principale */}
+        <List component="nav" sx={{ pt: 1 }}>
+          {/* Tableau de bord */}
+          <ListItemButton  
+            component={Link} 
+            to="/dashboard"
+            selected={isPathActive('/dashboard')}
+            sx={{ 
+              borderRadius: 2,
+              mx: 1,
+              mb: 0.5,
+              '&.Mui-selected': {
+                backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.25 : 0.15),
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.35 : 0.25),
+                },
+              },
+            }}
+          >
+            <ListItemIcon>
+              <DashboardIcon 
+                color={isPathActive('/dashboard') ? 'primary' : 'inherit'} 
+              />
+            </ListItemIcon>
+            <ListItemText primary="Tableau de bord" />
+          </ListItemButton>
           
           {/* Section Restaurant */}
           {hasPermission(user?.role, 'ACCESS_BACKOFFICE') && (
-            <SubMenu key="restaurant" icon={<ShopOutlined />} title="Restaurant">
-              {/* Réservations - accessible à tous */}
-              <Menu.Item key="/reservations" icon={<ClockCircleOutlined />}>
-                <Link to="/reservations">Réservations</Link>
-              </Menu.Item>
+            <>
+              <ListItemButton 
+                onClick={() => handleSubMenuToggle('restaurant')} 
+                sx={{ 
+                  borderRadius: 2,
+                  mx: 1,
+                  mb: 0.5,
+                  backgroundColor: subMenuOpen.restaurant 
+                    ? alpha(theme.palette.primary.main, isDark ? 0.2 : 0.1)
+                    : 'transparent',
+                }}
+              >
+                <ListItemIcon>
+                  <StorefrontIcon 
+                    color={subMenuOpen.restaurant ? 'primary' : 'inherit'} 
+                  />
+                </ListItemIcon>
+                <ListItemText primary="Restaurant" />
+                {subMenuOpen.restaurant ? <ExpandLess /> : <ExpandMore />}
+              </ListItemButton>
               
-              {/* Plan de salle - visible selon les permissions */}
-              {hasPermission(user?.role, 'VIEW_TABLE_STATUS') && (
-                <Menu.Item key="/floor-plans" icon={<TableOutlined />}>
-                  <Link to="/floor-plans">Plan de salle</Link>
-                </Menu.Item>
-              )}
-              
-              {/* Commandes - visible selon les permissions */}
-              {hasPermission(user?.role, 'CREATE_ORDER') && (
-                <Menu.Item key="/orders" icon={<ShoppingCartOutlined />}>
-                  <Link to="/orders">Commandes</Link>
-                </Menu.Item>
-              )}
-              
-              {/* Interface Cuisine - uniquement pour la cuisine */}
-              {user?.role === ROLES.STAFF_KITCHEN && (
-                <Menu.Item key="/kitchen" icon={<ShoppingCartOutlined />}>
-                  <Link to="/kitchen">Cuisine</Link>
-                </Menu.Item>
-              )}
-              
-              {/* Interface Bar - uniquement pour le bar */}
-              {user?.role === ROLES.STAFF_BAR && (
-                <Menu.Item key="/bar" icon={<CoffeeOutlined />}>
-                  <Link to="/bar">Bar</Link>
-                </Menu.Item>
-              )}
-              
-              {/* Facturation - visible selon les permissions */}
-              {hasPermission(user?.role, 'CREATE_INVOICE') && (
-                <Menu.Item key="/billing" icon={<FileTextOutlined />}>
-                  <Link to="/billing">Facturation</Link>
-                </Menu.Item>
-              )}
-            </SubMenu>
+              <Collapse in={subMenuOpen.restaurant} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  {/* Réservations */}
+                  <ListItemButton 
+                     
+                    component={Link} 
+                    to="/reservations"
+                    selected={isPathActive('/reservations')}
+                    sx={{ 
+                      pl: 4, 
+                      borderRadius: 2,
+                      mx: 1,
+                      mb: 0.5,
+                      '&.Mui-selected': {
+                        backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.25 : 0.15),
+                      },
+                    }}
+                  >
+                    <ListItemIcon>
+                      <AccessTimeIcon 
+                        color={isPathActive('/reservations') ? 'primary' : 'inherit'} 
+                      />
+                    </ListItemIcon>
+                    <ListItemText primary="Réservations" />
+                  </ListItemButton>
+                  
+                  {/* Plan de salle */}
+                  {hasPermission(user?.role, 'VIEW_TABLE_STATUS') && (
+                    <ListItemButton 
+                       
+                      component={Link} 
+                      to="/floor-plans"
+                      selected={isPathActive('/floor-plans')}
+                      sx={{ 
+                        pl: 4, 
+                        borderRadius: 2,
+                        mx: 1,
+                        mb: 0.5,
+                        '&.Mui-selected': {
+                          backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.25 : 0.15),
+                        },
+                      }}
+                    >
+                      <ListItemIcon>
+                        <TableRestaurantIcon 
+                          color={isPathActive('/floor-plans') ? 'primary' : 'inherit'} 
+                        />
+                      </ListItemIcon>
+                      <ListItemText primary="Plan de salle" />
+                    </ListItemButton>
+                  )}
+                  
+                  {/* Commandes */}
+                  {hasPermission(user?.role, 'CREATE_ORDER') && (
+                    <ListItemButton 
+                       
+                      component={Link} 
+                      to="/orders"
+                      selected={isPathActive('/orders')}
+                      sx={{ 
+                        pl: 4, 
+                        borderRadius: 2,
+                        mx: 1,
+                        mb: 0.5,
+                        '&.Mui-selected': {
+                          backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.25 : 0.15),
+                        },
+                      }}
+                    >
+                      <ListItemIcon>
+                        <ShoppingCartIcon 
+                          color={isPathActive('/orders') ? 'primary' : 'inherit'} 
+                        />
+                      </ListItemIcon>
+                      <ListItemText primary="Commandes" />
+                    </ListItemButton>
+                  )}
+                  
+                  {/* Interface Cuisine */}
+                  {user?.role === ROLES.STAFF_KITCHEN && (
+                    <ListItemButton 
+                       
+                      component={Link} 
+                      to="/kitchen"
+                      selected={isPathActive('/kitchen')}
+                      sx={{ 
+                        pl: 4, 
+                        borderRadius: 2,
+                        mx: 1,
+                        mb: 0.5,
+                        '&.Mui-selected': {
+                          backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.25 : 0.15),
+                        },
+                      }}
+                    >
+                      <ListItemIcon>
+                        <ShoppingCartIcon 
+                          color={isPathActive('/kitchen') ? 'primary' : 'inherit'} 
+                        />
+                      </ListItemIcon>
+                      <ListItemText primary="Cuisine" />
+                    </ListItemButton>
+                  )}
+                  
+                  {/* Interface Bar */}
+                  {user?.role === ROLES.STAFF_BAR && (
+                    <ListItemButton 
+                       
+                      component={Link} 
+                      to="/bar"
+                      selected={isPathActive('/bar')}
+                      sx={{ 
+                        pl: 4, 
+                        borderRadius: 2,
+                        mx: 1,
+                        mb: 0.5,
+                        '&.Mui-selected': {
+                          backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.25 : 0.15),
+                        },
+                      }}
+                    >
+                      <ListItemIcon>
+                        <LocalCafeIcon 
+                          color={isPathActive('/bar') ? 'primary' : 'inherit'} 
+                        />
+                      </ListItemIcon>
+                      <ListItemText primary="Bar" />
+                    </ListItemButton>
+                  )}
+                  
+                  {/* Facturation */}
+                  {hasPermission(user?.role, 'CREATE_INVOICE') && (
+                    <ListItemButton 
+                       
+                      component={Link} 
+                      to="/billing"
+                      selected={isPathActive('/billing')}
+                      sx={{ 
+                        pl: 4, 
+                        borderRadius: 2,
+                        mx: 1,
+                        mb: 0.5,
+                        '&.Mui-selected': {
+                          backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.25 : 0.15),
+                        },
+                      }}
+                    >
+                      <ListItemIcon>
+                        <ReceiptIcon 
+                          color={isPathActive('/billing') ? 'primary' : 'inherit'} 
+                        />
+                      </ListItemIcon>
+                      <ListItemText primary="Facturation" />
+                    </ListItemButton>
+                  )}
+                </List>
+              </Collapse>
+            </>
           )}
           
-          {/* Site vitrine - accessible uniquement aux guests */}
+          {/* Site vitrine */}
           {hasPermission(user?.role, 'ACCESS_SHOWCASE') && (
-            <Menu.Item key="/showcase" icon={<HomeOutlined />}>
-              <Link to="/showcase">Site vitrine</Link>
-            </Menu.Item>
+            <ListItemButton 
+               
+              component={Link} 
+              to="/showcase"
+              selected={isPathActive('/showcase')}
+              sx={{ 
+                borderRadius: 2,
+                mx: 1,
+                mb: 0.5,
+                '&.Mui-selected': {
+                  backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.25 : 0.15),
+                },
+              }}
+            >
+              <ListItemIcon>
+                <HomeIcon 
+                  color={isPathActive('/showcase') ? 'primary' : 'inherit'} 
+                />
+              </ListItemIcon>
+              <ListItemText primary="Site vitrine" />
+            </ListItemButton>
           )}
           
-          {/* Menu d'administration - visible uniquement pour Admin, Owner et Manager */}
+          {/* Section Administration */}
           {(user?.role === ROLES.ADMIN || user?.role === ROLES.OWNER || user?.role === ROLES.MANAGER) && (
-            <SubMenu key="admin" icon={<SettingOutlined />} title="Administration">
-              {/* Gestion des utilisateurs */}
-              {hasPermission(user?.role, 'VIEW_USERS') && (
-                <Menu.Item key="/users" icon={<TeamOutlined />}>
-                  <Link to="/users">Utilisateurs</Link>
-                </Menu.Item>
-              )}
+            <>
+              <ListItemButton 
+                onClick={() => handleSubMenuToggle('admin')} 
+                sx={{ 
+                  borderRadius: 2,
+                  mx: 1,
+                  mb: 0.5,
+                  backgroundColor: subMenuOpen.admin 
+                    ? alpha(theme.palette.primary.main, isDark ? 0.2 : 0.1)
+                    : 'transparent',
+                }}
+              >
+                <ListItemIcon>
+                  <SettingsIcon 
+                    color={subMenuOpen.admin ? 'primary' : 'inherit'} 
+                  />
+                </ListItemIcon>
+                <ListItemText primary="Administration" />
+                {subMenuOpen.admin ? <ExpandLess /> : <ExpandMore />}
+              </ListItemButton>
               
-              {/* Configuration des salles et tables */}
-              {hasPermission(user?.role, 'CREATE_ROOM_TABLE') && (
-                <Menu.Item key="/room-config" icon={<TableOutlined />}>
-                  <Link to="/room-config">Configuration des salles</Link>
-                </Menu.Item>
-              )}
-              
-              {/* Paramètres */}
-              {hasPermission(user?.role, 'EDIT_SETTINGS') && (
-                <Menu.Item key="/settings" icon={<SettingOutlined />}>
-                  <Link to="/settings">Paramètres</Link>
-                </Menu.Item>
-              )}
-            </SubMenu>
+              <Collapse in={subMenuOpen.admin} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  {/* Gestion des utilisateurs */}
+                  {hasPermission(user?.role, 'VIEW_USERS') && (
+                    <ListItemButton 
+                       
+                      component={Link} 
+                      to="/users"
+                      selected={isPathActive('/users')}
+                      sx={{ 
+                        pl: 4, 
+                        borderRadius: 2,
+                        mx: 1,
+                        mb: 0.5,
+                        '&.Mui-selected': {
+                          backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.25 : 0.15),
+                        },
+                      }}
+                    >
+                      <ListItemIcon>
+                        <PeopleIcon 
+                          color={isPathActive('/users') ? 'primary' : 'inherit'} 
+                        />
+                      </ListItemIcon>
+                      <ListItemText primary="Utilisateurs" />
+                    </ListItemButton>
+                  )}
+                  
+                  {/* Configuration des salles */}
+                  {hasPermission(user?.role, 'CREATE_ROOM_TABLE') && (
+                    <ListItemButton 
+                       
+                      component={Link} 
+                      to="/room-config"
+                      selected={isPathActive('/room-config')}
+                      sx={{ 
+                        pl: 4, 
+                        borderRadius: 2,
+                        mx: 1,
+                        mb: 0.5,
+                        '&.Mui-selected': {
+                          backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.25 : 0.15),
+                        },
+                      }}
+                    >
+                      <ListItemIcon>
+                        <TableRestaurantIcon 
+                          color={isPathActive('/room-config') ? 'primary' : 'inherit'} 
+                        />
+                      </ListItemIcon>
+                      <ListItemText primary="Configuration des salles" />
+                    </ListItemButton>
+                  )}
+                  
+                  {/* Paramètres */}
+                  {hasPermission(user?.role, 'EDIT_SETTINGS') && (
+                    <ListItemButton 
+                       
+                      component={Link} 
+                      to="/settings"
+                      selected={isPathActive('/settings')}
+                      sx={{ 
+                        pl: 4, 
+                        borderRadius: 2,
+                        mx: 1,
+                        mb: 0.5,
+                        '&.Mui-selected': {
+                          backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.25 : 0.15),
+                        },
+                      }}
+                    >
+                      <ListItemIcon>
+                        <SettingsIcon 
+                          color={isPathActive('/settings') ? 'primary' : 'inherit'} 
+                        />
+                      </ListItemIcon>
+                      <ListItemText primary="Paramètres" />
+                    </ListItemButton>
+                  )}
+                </List>
+              </Collapse>
+            </>
           )}
-        </Menu>
-      </Sider>
+        </List>
+      </Drawer>
       
-      {/* Layout principal */}
-      <Layout className="site-layout">
-        {/* Header avec bouton toggle et menu utilisateur */}
-        <Header
-          className="site-layout-background"
-          style={{
-            padding: 0,
-            background: '#fff',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          {/* Bouton pour replier/déplier la sidebar */}
-          <Button
-            type="text"
-            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            onClick={() => setCollapsed(!collapsed)}
-            style={{ fontSize: '16px', width: 64, height: 64 }}
-          />
-          
-          {/* Zone droite du header avec notifications et profil */}
-          <div style={{ display: 'flex', alignItems: 'center', marginRight: 20 }}>
-            {/* Icône de notifications avec badge */}
-            <Badge count={5} style={{ marginRight: 24 }}>
-              <Button icon={<BellOutlined />} shape="circle" />
-            </Badge>
-            
-            {/* Menu déroulant du profil utilisateur */}
-            <Dropdown overlay={userMenu} trigger={['click']}>
-              <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                <Avatar icon={getStaffIcon()} />
-                <span style={{ marginLeft: 8, display: collapsed ? 'none' : 'inline' }}>
-                  {user?.firstName} {user?.lastName}
-                  {isStaff() && ` (${staffType.toUpperCase()})`}
-                </span>
-              </div>
-            </Dropdown>
-          </div>
-        </Header>
-        
-        {/* Contenu principal - Outlet pour rendre les routes enfants */}
-        <Content
-          style={{
-            margin: '24px 16px',
-            padding: 24,
-            minHeight: 280,
-            background: '#fff',
-            borderRadius: 4,
+      {/* Contenu principal */}
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 3,
+          width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` },
+          ml: { xs: 0, md: open ? `${drawerWidth}px` : 0 },
+          transition: theme.transitions.create(['margin', 'width'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.leavingScreen,
+          }),
+          minHeight: '100vh',
+          pt: 8, // Pour compenser l'AppBar
+          background: isDark
+            ? `linear-gradient(135deg, ${alpha(theme.palette.primary.dark, 0.15)} 0%, ${alpha(theme.palette.background.default, 0.95)} 100%)`
+            : `linear-gradient(135deg, ${alpha(theme.palette.primary.light, 0.05)} 0%, ${alpha(theme.palette.primary.main, 0.02)} 100%)`,
+          backgroundAttachment: 'fixed',
+          backgroundSize: 'cover',
+        }}
+      >
+        <Box
+          sx={{
+            background: alpha(theme.palette.background.paper, isDark ? 0.7 : 0.8),
+            backdropFilter: 'blur(10px)',
+            borderRadius: 2,
+            boxShadow: `0 8px 32px 0 ${alpha(isDark ? '#000' : theme.palette.primary.dark, 0.1)}`,
+            border: `1px solid ${alpha(isDark ? theme.palette.divider : theme.palette.background.paper, 0.5)}`,
+            p: 3,
+            mb: 2,
+            minHeight: '80vh',
             overflow: 'auto'
           }}
         >
           <Outlet />
-        </Content>
-      </Layout>
-    </Layout>
+        </Box>
+      </Box>
+    </Box>
   );
 };
 

@@ -1,27 +1,34 @@
+// vite.config.js
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export default defineConfig({
-  plugins: [
-    react(), // Le plugin react standard sans options supplémentaires
-  ],
+  plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
-    extensions: ['.mjs', '.js', '.jsx', '.ts', '.tsx', '.json']
   },
-  server: {
-    port: 5173,
-    open: true,
-    hmr: {
-      overlay: true
-    }
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      '@mui/material',
+      '@mui/icons-material',
+      '@emotion/react',
+      '@emotion/styled',
+    ],
+    // Vous pouvez retirer l'exclusion de react-dom/client avec React 18
   },
   build: {
     sourcemap: true,
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
   },
-  // La section esbuild a été complètement supprimée pour éviter les conflits
-  // Notamment l'option jsxInject qui causait le problème
 });

@@ -118,6 +118,47 @@ const floorPlanSlice = createSlice({
       }
     },
     
+    // Nouveau reducer pour mettre à jour la position d'une table (drag & drop)
+    updateTablePosition: (state, action) => {
+  // Ajout de log pour débogage
+  console.log("updateTablePosition action:", action.payload);
+  
+  const { tableId, position } = action.payload;
+  
+  if (state.currentFloorPlan && state.currentFloorPlan.tables) {
+    const tableIndex = state.currentFloorPlan.tables.findIndex(table => table.id === tableId);
+    
+    // Debug
+    console.log(`Table search: id=${tableId}, found at index=${tableIndex}`);
+    
+    if (tableIndex !== -1) {
+      // Mise à jour de la position de la table
+      console.log("Before update:", {
+        x: state.currentFloorPlan.tables[tableIndex].x, 
+        y: state.currentFloorPlan.tables[tableIndex].y
+      });
+      
+      state.currentFloorPlan.tables[tableIndex] = {
+        ...state.currentFloorPlan.tables[tableIndex],
+        x: position.x,
+        y: position.y
+      };
+      
+      console.log("After update:", {
+        x: state.currentFloorPlan.tables[tableIndex].x, 
+        y: state.currentFloorPlan.tables[tableIndex].y
+      });
+    } else {
+      console.error("Table not found with id:", tableId);
+      console.log("Available tables:", state.currentFloorPlan.tables.map(t => t.id));
+    }
+  } else {
+    console.error("No current floor plan or no tables array");
+  }
+},
+
+
+    
     // Sélectionner un plan comme courant
     setCurrentFloorPlan(state, action) {
       state.currentFloorPlan = action.payload;
@@ -149,6 +190,7 @@ export const {
   addTable,
   updateTable,
   deleteTable,
+  updateTablePosition, // Nouvelle action exportée
   setCurrentFloorPlan,
   clearCurrentFloorPlan
 } = floorPlanSlice.actions;

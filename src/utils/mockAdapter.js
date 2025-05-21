@@ -138,6 +138,148 @@ const setupMock = (axiosInstance) => {
     
     return [200, mockTables[tableIndex]];
   });
+
+   // ========== FLOOR PLANS ==========
+  
+  // Données fictives pour les plans de salle
+  const mockFloorPlans = [
+    {
+      id: '1',
+      name: 'Salle principale',
+      description: 'Rez-de-chaussée, 20 tables',
+      tables: [
+        {
+          id: '101',
+          label: 'Table 1',
+          capacity: 4,
+          shape: 'rectangle',
+          color: '#3498db',
+          x: 100,
+          y: 100,
+          width: 80,
+          height: 80
+        },
+        {
+          id: '102',
+          label: 'Table 2',
+          capacity: 2,
+          shape: 'circle',
+          color: '#e74c3c',
+          x: 250,
+          y: 120,
+          width: 60,
+          height: 60
+        },
+        {
+          id: '103',
+          label: 'Table 3',
+          capacity: 6,
+          shape: 'rectangle',
+          color: '#2ecc71',
+          x: 150,
+          y: 250,
+          width: 120,
+          height: 80
+        }
+      ]
+    },
+    {
+      id: '2',
+      name: 'Terrasse',
+      description: 'Extérieur, 8 tables',
+      tables: [
+        {
+          id: '201',
+          label: 'Terrasse 1',
+          capacity: 4,
+          shape: 'circle',
+          color: '#f39c12',
+          x: 80,
+          y: 80,
+          width: 70,
+          height: 70
+        },
+        {
+          id: '202',
+          label: 'Terrasse 2',
+          capacity: 4,
+          shape: 'circle',
+          color: '#f39c12',
+          x: 200,
+          y: 80,
+          width: 70,
+          height: 70
+        }
+      ]
+    }
+  ];
+
+  // GET /floor-plans - Récupération de tous les plans
+  mock.onGet('/floor-plans').reply(200, mockFloorPlans);
+
+  // GET /floor-plans/:id - Récupération d'un plan spécifique
+  mock.onGet(/\/floor-plans\/\w+/).reply((config) => {
+    const id = config.url.split('/').pop();
+    const floorPlan = mockFloorPlans.find(plan => plan.id === id);
+    
+    if (!floorPlan) {
+      return [404, { message: 'Plan de salle non trouvé' }];
+    }
+    
+    return [200, floorPlan];
+  });
+
+  // POST /floor-plans - Création d'un nouveau plan
+  mock.onPost('/floor-plans').reply((config) => {
+    const floorPlanData = JSON.parse(config.data);
+    
+    const newFloorPlan = {
+      id: Date.now().toString(),
+      ...floorPlanData,
+      tables: floorPlanData.tables || []
+    };
+    
+    // En situation réelle, nous ajouterions à la base de données
+    // Ici, pour le mock, nous le retournons simplement
+    return [201, newFloorPlan];
+  });
+
+  // PUT /floor-plans/:id - Mise à jour d'un plan
+  mock.onPut(/\/floor-plans\/\w+/).reply((config) => {
+    const id = config.url.split('/').pop();
+    const updatedData = JSON.parse(config.data);
+    
+    const floorPlanIndex = mockFloorPlans.findIndex(plan => plan.id === id);
+    
+    if (floorPlanIndex === -1) {
+      return [404, { message: 'Plan de salle non trouvé' }];
+    }
+    
+    // En situation réelle, nous mettrions à jour la base de données
+    // Ici, nous retournons simplement les données mises à jour
+    const updatedFloorPlan = {
+      ...mockFloorPlans[floorPlanIndex],
+      ...updatedData,
+      id // Préserver l'ID d'origine
+    };
+    
+    return [200, updatedFloorPlan];
+  });
+
+  // DELETE /floor-plans/:id - Suppression d'un plan
+  mock.onDelete(/\/floor-plans\/\w+/).reply((config) => {
+    const id = config.url.split('/').pop();
+    
+    const floorPlanIndex = mockFloorPlans.findIndex(plan => plan.id === id);
+    
+    if (floorPlanIndex === -1) {
+      return [404, { message: 'Plan de salle non trouvé' }];
+    }
+    
+    // En situation réelle, nous supprimerions de la base de données
+    // Ici, nous retournons simplement l'ID supprimé
+    return [200, { id }];
+  });
   
   // ========== RÉSERVATIONS ==========
   

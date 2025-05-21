@@ -1,5 +1,5 @@
 import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
 
@@ -9,8 +9,7 @@ if (import.meta.env.DEV) {
   console.log('API Mocks: ', import.meta.env.VITE_ENABLE_MOCKS === 'true' ? 'ENABLED' : 'DISABLED');
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
+createRoot(document.getElementById('root')).render(  <React.StrictMode>
     <App />
   </React.StrictMode>
 );
