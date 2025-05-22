@@ -57,7 +57,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { hasPermission, PERMISSIONS } from '../../utils/permissions';
 // Importez le nouveau service
 import floorPlanService from '../../services/floorPlanService';
-
+import FloorPlanEditor from '../../components/floorPlan/FloorPlanEditor';
 const { Content, Sider } = Layout;
 const { Title, Text } = Typography;
 
@@ -471,19 +471,31 @@ const canDelete = isDevelopment ? true : hasPermission(user?.role, PERMISSIONS.D
         </Drawer>
       </Content>
       
-      {/* Modal pour créer/éditer un plan */}
-      <Modal
-        title={isEditingFloorPlan ? "Modifier le plan de salle" : "Créer un nouveau plan de salle"}
-        open={floorPlanModalVisible}
-        onCancel={() => setFloorPlanModalVisible(false)}
-        footer={null}
-      >
-        <FloorPlanForm
-          onSubmit={isEditingFloorPlan ? handleUpdateFloorPlan : handleCreateFloorPlan}
-          initialValues={isEditingFloorPlan ? currentFloorPlan : null}
-          isEdit={isEditingFloorPlan}
-        />
-      </Modal>
+     {/* Modal pour créer/éditer un plan */}
+<Modal
+  title={isEditingFloorPlan ? "Modifier le plan de salle" : "Créer un nouveau plan de salle"}
+  open={floorPlanModalVisible}
+  onCancel={() => setFloorPlanModalVisible(false)}
+  footer={null}
+  width={1200} // Augmenter la largeur pour accommoder l'éditeur amélioré
+>
+  {isEditingFloorPlan ? (
+    <FloorPlanEditor 
+      currentFloorPlan={currentFloorPlan}
+      editable={canEdit}
+      onSaveFloorPlan={(updatedPlan) => {
+        handleUpdateFloorPlan(updatedPlan);
+        setFloorPlanModalVisible(false);
+      }}
+    />
+  ) : (
+    <FloorPlanForm
+      onSubmit={handleCreateFloorPlan}
+      initialValues={null}
+      isEdit={false}
+    />
+  )}
+</Modal>
       
       {/* Modal pour ajouter/éditer une table */}
       <Modal

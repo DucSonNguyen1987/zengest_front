@@ -118,46 +118,99 @@ const floorPlanSlice = createSlice({
       }
     },
     
-    // Nouveau reducer pour mettre à jour la position d'une table (drag & drop)
-    updateTablePosition: (state, action) => {
-  // Ajout de log pour débogage
-  console.log("updateTablePosition action:", action.payload);
-  
-  const { tableId, position } = action.payload;
-  
-  if (state.currentFloorPlan && state.currentFloorPlan.tables) {
-    const tableIndex = state.currentFloorPlan.tables.findIndex(table => table.id === tableId);
-    
-    // Debug
-    console.log(`Table search: id=${tableId}, found at index=${tableIndex}`);
-    
-    if (tableIndex !== -1) {
-      // Mise à jour de la position de la table
-      console.log("Before update:", {
-        x: state.currentFloorPlan.tables[tableIndex].x, 
-        y: state.currentFloorPlan.tables[tableIndex].y
-      });
+    // Mettre à jour la position d'une table
+    updateTablePosition(state, action) {
+      const { tableId, position } = action.payload;
       
-      state.currentFloorPlan.tables[tableIndex] = {
-        ...state.currentFloorPlan.tables[tableIndex],
-        x: position.x,
-        y: position.y
-      };
+      if (state.currentFloorPlan && state.currentFloorPlan.tables) {
+        const tableIndex = state.currentFloorPlan.tables.findIndex(table => table.id === tableId);
+        
+        if (tableIndex !== -1) {
+          state.currentFloorPlan.tables[tableIndex] = {
+            ...state.currentFloorPlan.tables[tableIndex],
+            x: position.x,
+            y: position.y
+          };
+        }
+      }
+    },
+    
+    // ACTIONS POUR LES OBSTACLES
+    
+    // Ajouter un obstacle
+    addObstacle(state, action) {
+      if (state.currentFloorPlan) {
+        if (!state.currentFloorPlan.obstacles) {
+          state.currentFloorPlan.obstacles = [];
+        }
+        state.currentFloorPlan.obstacles.push(action.payload);
+      }
+    },
+    
+    // Mettre à jour un obstacle (VERSION CORRIGÉE)
+    updateObstacle(state, action) {
+      const { obstacleId, updates } = action.payload;
       
-      console.log("After update:", {
-        x: state.currentFloorPlan.tables[tableIndex].x, 
-        y: state.currentFloorPlan.tables[tableIndex].y
-      });
-    } else {
-      console.error("Table not found with id:", tableId);
-      console.log("Available tables:", state.currentFloorPlan.tables.map(t => t.id));
-    }
-  } else {
-    console.error("No current floor plan or no tables array");
-  }
-},
-
-
+      if (state.currentFloorPlan && state.currentFloorPlan.obstacles) {
+        const obstacleIndex = state.currentFloorPlan.obstacles.findIndex(
+          obstacle => obstacle.id === obstacleId
+        );
+        
+        if (obstacleIndex !== -1) {
+          // Fusionner les modifications avec l'obstacle existant
+          state.currentFloorPlan.obstacles[obstacleIndex] = {
+            ...state.currentFloorPlan.obstacles[obstacleIndex],
+            ...updates
+          };
+        }
+      }
+    },
+    
+    // Supprimer un obstacle
+    removeObstacle(state, action) {
+      if (state.currentFloorPlan && state.currentFloorPlan.obstacles) {
+        state.currentFloorPlan.obstacles = state.currentFloorPlan.obstacles.filter(
+          obstacle => obstacle.id !== action.payload
+        );
+      }
+    },
+    
+    // Mettre à jour la position d'un obstacle
+    updateObstaclePosition(state, action) {
+      const { obstacleId, position } = action.payload;
+      
+      if (state.currentFloorPlan && state.currentFloorPlan.obstacles) {
+        const obstacleIndex = state.currentFloorPlan.obstacles.findIndex(
+          obstacle => obstacle.id === obstacleId
+        );
+        
+        if (obstacleIndex !== -1) {
+          state.currentFloorPlan.obstacles[obstacleIndex] = {
+            ...state.currentFloorPlan.obstacles[obstacleIndex],
+            x: position.x,
+            y: position.y
+          };
+        }
+      }
+    },
+    
+    // Définir le périmètre
+    setPerimeter(state, action) {
+      if (state.currentFloorPlan) {
+        state.currentFloorPlan.perimeter = action.payload.perimeter;
+        state.currentFloorPlan.perimeterShape = action.payload.perimeterShape;
+        if (action.payload.perimeterParams) {
+          state.currentFloorPlan.perimeterParams = action.payload.perimeterParams;
+        }
+      }
+    },
+    
+    // Mettre à jour la limite de capacité
+    updateCapacityLimit(state, action) {
+      if (state.currentFloorPlan) {
+        state.currentFloorPlan.capacityLimit = action.payload;
+      }
+    },
     
     // Sélectionner un plan comme courant
     setCurrentFloorPlan(state, action) {
@@ -190,9 +243,16 @@ export const {
   addTable,
   updateTable,
   deleteTable,
-  updateTablePosition, // Nouvelle action exportée
+  updateTablePosition,
   setCurrentFloorPlan,
-  clearCurrentFloorPlan
+  clearCurrentFloorPlan,
+  // Actions pour les obstacles
+  addObstacle,
+  updateObstacle,
+  removeObstacle,
+  updateObstaclePosition,
+  setPerimeter,
+  updateCapacityLimit
 } = floorPlanSlice.actions;
 
 export default floorPlanSlice.reducer;

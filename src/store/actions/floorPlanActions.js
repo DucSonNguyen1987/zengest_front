@@ -20,12 +20,13 @@ import {
 // Données mock - stockage local pour simuler une base de données
 let mockFloorPlans = [
   {
-    id: 'plan-1',
+    id: '1', // Changé de 'plan-1' à '1' pour correspondre aux logs
     name: 'Plan de restaurant principal',
     description: 'Plan de la salle principale - 20 tables',
+    capacityLimit: 50,
     tables: [
       {
-        id: 'table-1',
+        id: '101',
         label: 'Table 1',
         capacity: 4,
         shape: 'rectangle',
@@ -37,7 +38,7 @@ let mockFloorPlans = [
         color: '#f0f0f0'
       },
       {
-        id: 'table-2',
+        id: '102',
         label: 'Table 2',
         capacity: 2,
         shape: 'circle',
@@ -47,14 +48,67 @@ let mockFloorPlans = [
         y: 150,
         rotation: 0,
         color: '#e6f7ff'
+      },
+      {
+        id: '103',
+        label: 'Table 3',
+        capacity: 6,
+        shape: 'rectangle',
+        width: 100,
+        height: 60,
+        x: 150,
+        y: 250,
+        rotation: 0,
+        color: '#f6ffed'
       }
-    ]
+    ],
+    obstacles: [
+      {
+        id: 'obstacle-1',
+        type: 'obstacle',
+        category: 'mur',
+        shape: 'rectangle',
+        color: '#8B4513',
+        x: 50,
+        y: 350,
+        width: 200,
+        height: 20,
+        rotation: 0
+      },
+      {
+        id: 'obstacle-2',
+        type: 'obstacle',
+        category: 'poteau',
+        shape: 'circle',
+        color: '#696969',
+        x: 400,
+        y: 200,
+        width: 30,
+        height: 30,
+        rotation: 0
+      }
+    ],
+    perimeter: [
+      { x: 50, y: 50 },
+      { x: 750, y: 50 },
+      { x: 750, y: 550 },
+      { x: 50, y: 550 }
+    ],
+    perimeterShape: 'rectangle',
+    perimeterParams: {
+      width: 700,
+      height: 500,
+      x: 400,
+      y: 300
+    }
   },
   {
-    id: 'plan-2',
+    id: '2',
     name: 'Terrasse',
     description: 'Plan de la terrasse extérieure',
-    tables: []
+    capacityLimit: 30,
+    tables: [],
+    obstacles: []
   }
 ];
 

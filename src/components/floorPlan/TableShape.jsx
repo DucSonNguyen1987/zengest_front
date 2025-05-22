@@ -1,215 +1,184 @@
-import React, { useRef, useEffect } from 'react';
-import { Group, Rect, Text, Circle } from 'react-konva';
+import React, { useCallback, useMemo } from 'react';
+import { Group, Rect, Circle, Text } from 'react-konva';
 
-const TableShape = ({
-  tableData,
-  isSelected,
+const TableShape = React.memo(({
+  table,
+  tableData, // Compatibilité avec l'ancien nom
+  isSelected = false,
+  selected = false, // Compatibilité avec l'ancien nom
   onSelect,
-  onChange,
-  draggable,
-  isDarkMode,
+  draggable = false,
+  isDarkMode = false,
   onDragEnd,
-  dragBorderColor = '#1976d2',
-  showDragHandles = false
+  dragBorderColor = '#1976d2'
 }) => {
-  const shapeRef = useRef();
-  const textRef = useRef();
-  const capacityRef = useRef();
+  // Utiliser table ou tableData pour la compatibilité
+  const tableInfo = table || tableData;
   
-  const { 
-    id, 
-    x = 50, 
-    y = 50, 
-    width = 80, 
-    height = 80, 
-    label = 'Table', 
-    capacity = 0, 
-    shape = 'rectangle', 
-    color = '#3498db',
-    rotation = 0 // Extraction de la propriété rotation
-  } = tableData;
-  
-  // Debug: Log les props reçues
-  useEffect(() => {
-    console.log(`TableShape ${id} - draggable: ${draggable}, showDragHandles: ${showDragHandles}, rotation: ${rotation}`);
-  }, [id, draggable, showDragHandles, rotation]);
-  
-  const handleDragStart = () => {
-    // Debug: Log le début du drag
-    console.log(`TableShape ${id} - DRAG START at position: x=${x}, y=${y}`);
-  };
-  
-  const handleDragEnd = (e) => {
-    // Debug: Log la fin du drag
-    const newX = e.target.x();
-    const newY = e.target.y();
-    console.log(`TableShape ${id} - DRAG END to position: x=${newX}, y=${newY}`);
+  // Validation et sécurisation des données - CRITIQUE
+  const safeTable = useMemo(() => {
+    if (!tableInfo) return null;
     
-    // Mettre à jour l'état local
-    onChange({
-      ...tableData,
-      x: newX,
-      y: newY,
-    });
+    // Validation stricte des dimensions pour éviter l'erreur Konva
+    const width = Math.max(Number(tableInfo.width) || 80, 20);
+    const height = Math.max(Number(tableInfo.height) || 80, 20);
+    const x = Number(tableInfo.x) || 0;
+    const y = Number(tableInfo.y) || 0;
     
-    // Notifier le parent que le drag est terminé
-    if (onDragEnd) {
-      onDragEnd({
-        x: newX,
-        y: newY
-      });
+    // Vérifications de sécurité supplémentaires
+    if (isNaN(width) || isNaN(height) || isNaN(x) || isNaN(y)) {
+      console.warn('TableShape: Invalid dimensions detected, using defaults');
+      return {
+        id: tableInfo.id || 'unknown',
+        x: 100,
+        y: 100,
+        width: 80,
+        height: 80,
+        capacity: 4,
+        color: '#e6f7ff',
+        shape: 'rectangle',
+        label: `Table ${tableInfo.id}`,
+        rotation: 0
+      };
     }
-  };
-  
-  const textColor = isDarkMode ? '#ffffff' : '#ffffff';
-  const strokeColor = isDarkMode ? '#555555' : '#2c3e50';
-  const selectionColor = isDarkMode ? '#90caf9' : '#1976d2';
-  
-  // Déterminer l'opacité en fonction du mode drag
-  const fillOpacity = draggable ? 0.9 : 0.7;
-  const strokeWidth = isSelected ? 2 : 1;
-  
-  return (
-    <Group
-      x={x}
-      y={y}
-      rotation={rotation} // Appliquer la rotation au groupe entier
-      draggable={draggable}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onClick={onSelect}
-      onTap={onSelect}
-      ref={shapeRef}
-      // Définir le point d'origine de la rotation au centre de la table
-      offsetX={shape === 'circle' ? width / 2 : width / 2}
-      offsetY={shape === 'circle' ? height / 2 : height / 2}
-    >
-      {/* Ajout d'une bordure rouge visible pour indiquer que la table est draggable */}
-      {draggable && (
-        <Rect
-          width={width + 10}
-          height={height + 10}
-          x={-width/2 - 5}
-          y={-height/2 - 5}
-          stroke="red"
-          strokeWidth={2}
-          dash={[4, 2]}
-          fill="transparent"
-          perfectDrawEnabled={false}
-        />
-      )}
     
-      {/* Forme de la table selon le type */}
-      {shape === 'circle' ? (
-        <Circle
-          radius={Math.min(width, height) / 2}
-          x={0} // Centré à 0 car le groupe est décalé par offsetX/Y
-          y={0} // Centré à 0 car le groupe est décalé par offsetX/Y
-          fill={color}
-          stroke={isSelected ? selectionColor : strokeColor}
-          strokeWidth={strokeWidth}
-          opacity={fillOpacity}
-          shadowColor={isSelected ? selectionColor : 'transparent'}
-          shadowBlur={isSelected ? 10 : 0}
-          shadowOpacity={0.3}
-          perfectDrawEnabled={false}
-        />
-      ) : (
-        <Rect
-          width={width}
-          height={height}
-          x={-width/2} // Centré à -width/2 car le groupe est décalé par offsetX
-          y={-height/2} // Centré à -height/2 car le groupe est décalé par offsetY
-          fill={color}
-          stroke={isSelected ? selectionColor : strokeColor}
-          strokeWidth={strokeWidth}
-          cornerRadius={8}
-          opacity={fillOpacity}
-          shadowColor={isSelected ? selectionColor : 'transparent'}
-          shadowBlur={isSelected ? 10 : 0}
-          shadowOpacity={0.3}
-          perfectDrawEnabled={false}
-        />
-      )}
+    return {
+      id: tableInfo.id || 'unknown',
+      x,
+      y,
+      width,
+      height,
+      capacity: Math.max(Number(tableInfo.capacity) || 4, 1),
+      color: tableInfo.color || '#e6f7ff',
+      shape: tableInfo.shape || 'rectangle',
+      label: tableInfo.label || `Table ${tableInfo.id}`,
+      rotation: Number(tableInfo.rotation) || 0
+    };
+  }, [tableInfo]);
+  
+  // Déterminer si la table est sélectionnée
+  const isTableSelected = isSelected || selected;
+  
+  // Gestionnaire de clic optimisé
+  const handleClick = useCallback(() => {
+    if (onSelect && safeTable) {
+      onSelect(safeTable);
+    }
+  }, [onSelect, safeTable]);
+  
+  // Gestionnaire de fin de drag optimisé
+  const handleDragEnd = useCallback((e) => {
+    if (!onDragEnd) return;
+    
+    try {
+      const newPosition = {
+        x: e.target.x(),
+        y: e.target.y()
+      };
       
-      {/* Bordure de déplacement */}
-      {draggable && showDragHandles && (
-        <Rect
-          width={width + 6}
-          height={height + 6}
-          x={-width/2 - 3}
-          y={-height/2 - 3}
-          stroke={dragBorderColor}
-          strokeWidth={1}
-          dash={[4, 2]}
-          fill="transparent"
-          cornerRadius={10}
-          perfectDrawEnabled={false}
-        />
-      )}
-      
-      {/* Poignées de déplacement */}
-      {draggable && showDragHandles && [
-        { x: -width/2 - 5, y: -height/2 - 5 },
-        { x: width/2 + 5 - 8, y: -height/2 - 5 },
-        { x: -width/2 - 5, y: height/2 + 5 - 8 },
-        { x: width/2 + 5 - 8, y: height/2 + 5 - 8 }
-      ].map((pos, i) => (
-        <Circle
-          key={i}
-          x={pos.x}
-          y={pos.y}
-          radius={4}
-          fill={dragBorderColor}
-          opacity={0.8}
-          perfectDrawEnabled={false}
-        />
-      ))}
-      
-      {/* Numéro/Label de la table */}
-      <Text
-        text={label}
-        width={width}
-        height={height}
-        x={-width/2}
-        y={-height/2 + (shape === 'circle' ? -8 : 0)}
-        align="center"
-        verticalAlign="middle"
-        fill={textColor}
-        fontSize={16}
-        fontStyle="bold"
-        ref={textRef}
-        perfectDrawEnabled={false}
-      />
-      
-      {/* Capacité de la table */}
-      <Text
-        text={`${capacity} pers.`}
-        width={width}
-        height={height}
-        x={-width/2}
-        y={-height/2 + 18}
-        align="center"
-        verticalAlign="middle"
-        fill={textColor}
-        fontSize={12}
-        ref={capacityRef}
-        perfectDrawEnabled={false}
-      />
-      
-      {/* Indicateur de rotation (optionnel, pour le débogage) */}
-      {rotation !== 0 && (
+      onDragEnd(newPosition);
+    } catch (error) {
+      console.warn('TableShape: Error in drag end handler:', error);
+    }
+  }, [onDragEnd]);
+  
+  // Couleurs et styles optimisés
+  const styles = useMemo(() => {
+    if (!safeTable) return {};
+    
+    const baseColor = safeTable.color;
+    const borderColor = isTableSelected ? dragBorderColor : '#ccc';
+    const borderWidth = isTableSelected ? 3 : 1;
+    const shadowOpacity = isTableSelected ? 0.3 : 0;
+    
+    return {
+      fill: baseColor,
+      stroke: borderColor,
+      strokeWidth: borderWidth,
+      shadowColor: borderColor,
+      shadowOpacity,
+      shadowOffsetX: shadowOpacity > 0 ? 2 : 0,
+      shadowOffsetY: shadowOpacity > 0 ? 2 : 0,
+      shadowBlur: shadowOpacity > 0 ? 5 : 0
+    };
+  }, [safeTable, isTableSelected, dragBorderColor]);
+  
+  // Ne pas rendre si les données sont invalides
+  if (!safeTable || safeTable.width <= 0 || safeTable.height <= 0) {
+    return null;
+  }
+  
+  // Calculer la taille du texte proportionnellement avec limites de sécurité
+  const fontSize = Math.max(Math.min(safeTable.width, safeTable.height) * 0.2, 10);
+  const textColor = isDarkMode ? '#ffffff' : '#333333';
+  
+  try {
+    return (
+      <Group
+        x={safeTable.x}
+        y={safeTable.y}
+        draggable={draggable}
+        onDragEnd={handleDragEnd}
+        onClick={handleClick}
+        onTap={handleClick}
+        rotation={safeTable.rotation}
+      >
+        {/* Forme de la table avec validation des dimensions */}
+        {safeTable.shape === 'circle' ? (
+          <Circle
+            radius={Math.max(safeTable.width / 2, 10)}
+            {...styles}
+            offsetX={0}
+            offsetY={0}
+          />
+        ) : (
+          <Rect
+            width={Math.max(safeTable.width, 20)}
+            height={Math.max(safeTable.height, 20)}
+            {...styles}
+            cornerRadius={4}
+            offsetX={safeTable.width / 2}
+            offsetY={safeTable.height / 2}
+          />
+        )}
+        
+        {/* Texte avec le numéro de capacité */}
         <Text
-          text={`${rotation}°`}
-          x={-15}
-          y={-height/2 - 20}
-          fill="red"
-          fontSize={10}
-          perfectDrawEnabled={false}
+          text={safeTable.capacity.toString()}
+          fontSize={Math.max(fontSize, 10)}
+          fontFamily="Arial"
+          fill={textColor}
+          align="center"
+          verticalAlign="middle"
+          offsetX={safeTable.shape === 'circle' ? 0 : safeTable.width / 2}
+          offsetY={safeTable.shape === 'circle' ? 0 : safeTable.height / 2}
+          width={safeTable.shape === 'circle' ? undefined : safeTable.width}
+          height={safeTable.shape === 'circle' ? undefined : safeTable.height}
+          listening={false}
         />
-      )}
-    </Group>
-  );
-};
+        
+        {/* Label de la table si disponible */}
+        {safeTable.label && safeTable.label !== `Table ${safeTable.id}` && (
+          <Text
+            text={safeTable.label}
+            fontSize={Math.max(fontSize * 0.7, 8)}
+            fontFamily="Arial"
+            fill={textColor}
+            align="center"
+            offsetX={safeTable.shape === 'circle' ? 0 : safeTable.width / 2}
+            offsetY={safeTable.shape === 'circle' ? -fontSize : (safeTable.height / 2) - fontSize}
+            width={safeTable.shape === 'circle' ? undefined : safeTable.width}
+            listening={false}
+          />
+        )}
+      </Group>
+    );
+  } catch (error) {
+    console.warn('TableShape: Render error:', error);
+    return null;
+  }
+});
+
+TableShape.displayName = 'TableShape';
 
 export default TableShape;

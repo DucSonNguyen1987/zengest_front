@@ -1,7 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Stage, Layer, Rect } from 'react-konva';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { Stage, Layer, Rect, Circle, Line, Group, RegularPolygon } from 'react-konva';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateTable, deleteTable, updateTablePosition } from '../../store/slices/floorPlanSlice';
+import { 
+  deleteTable, 
+  updateTablePosition,
+  updateObstaclePosition,
+  removeObstacle
+} from '../../store/slices/floorPlanSlice';
 import TableShape from './TableShape';
 import { 
   Box, 
@@ -18,7 +23,43 @@ import {
 } from '@mui/icons-material';
 import { useColorMode } from '../../context/ThemeContext';
 
-const Canvas = ({ editable = true, height = 400, dragMode = false, onTableDragEnd }) => {
+// ===== FONCTIONS DE VALIDATION CRITIQUES =====
+
+const validateDimensions = (width, height, minSize = 5) => {
+  const safeWidth = Math.max(Number(width) || minSize, minSize);
+  const safeHeight = Math.max(Number(height) || minSize, minSize);
+  return { width: safeWidth, height: safeHeight };
+};
+
+const validatePosition = (x, y) => {
+  const safeX = Number(x) || 0;
+  const safeY = Number(y) || 0;
+  return { x: safeX, y: safeY };
+};
+
+const validateColor = (color, defaultColor = '#cccccc') => {
+  return (typeof color === 'string' && color.length > 0) ? color : defaultColor;
+};
+
+const validateRotation = (rotation) => {
+  const rot = Number(rotation) || 0;
+  return isNaN(rot) ? 0 : rot;
+};
+
+const Canvas = ({ 
+  editable = true, 
+  height = 400, 
+  dragMode = false,
+  onTableDragEnd,
+  showPerimeter = true,
+  showObstacles = true,
+  width: propWidth = 800,
+  onItemSelect,
+  selectedItem,
+  onObstacleDragEnd: propOnObstacleDragEnd,
+  obstaclesDraggable = false,
+  debug = false
+}) => {
   const theme = useTheme();
   const { mode } = useColorMode();
   const isDark = mode === 'dark';
@@ -28,23 +69,17 @@ const Canvas = ({ editable = true, height = 400, dragMode = false, onTableDragEn
   const stageRef = useRef(null);
   const containerRef = useRef(null);
   const [selectedId, setSelectedId] = useState(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 400, height });
+  const [selectedType, setSelectedType] = useState(null);
   
-
-
-useEffect(() => {
-  console.log("Canvas props:", { editable, dragMode, onTableDragEnd });
-  // Si onTableDragEnd est undefined, mettons un log d'avertissement
-  if (!onTableDragEnd) {
-    console.warn("onTableDragEnd callback is not provided to Canvas");
-  }
-}, [editable, dragMode, onTableDragEnd]);
-
-
-
-
-
-
+  // États pour les dimensions du canvas - SÉCURISÉS
+  const [canvasSize, setCanvasSize] = useState(() => {
+    const validatedSize = validateDimensions(propWidth, height, 400);
+    return {
+      width: Math.max(validatedSize.width, 400),
+      height: Math.max(validatedSize.height, 300)
+    };
+  });
+  
   // État pour le message de succès
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -53,80 +88,124 @@ useEffect(() => {
   });
   
   // Fermer le snackbar
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
-  
-  // Ajustement du canvas au redimensionnement de la fenêtre
-  useEffect(() => {
-    const checkSize = () => {
-      if (containerRef.current) {
-        setCanvasSize({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight,
-        });
-      }
-    };
+  const handleCloseSnackbar = useCallback(() => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  }, []);
+
+  // Mise à jour sécurisée de la taille du canvas
+  const updateCanvasSize = useCallback(() => {
+    if (!containerRef.current) return;
     
-    // Observer pour détecter les changements dans le DOM parent
+    try {
+      const containerWidth = containerRef.current.offsetWidth;
+      const containerHeight = containerRef.current.offsetHeight;
+      
+      const validatedSize = validateDimensions(
+        containerWidth || propWidth,
+        containerHeight || height,
+        400
+      );
+      
+      setCanvasSize(prevSize => {
+        if (prevSize.width !== validatedSize.width || prevSize.height !== validatedSize.height) {
+          return {
+            width: Math.max(validatedSize.width, 400),
+            height: Math.max(validatedSize.height, 300)
+          };
+        }
+        return prevSize;
+      });
+    } catch (error) {
+      console.warn('Erreur lors de la mise à jour des dimensions:', error);
+    }
+  }, [propWidth, height]);
+  
+  // Observer pour les changements de taille - OPTIMISÉ
+  useEffect(() => {
+    updateCanvasSize();
+    
     const resizeObserver = new ResizeObserver(() => {
-      checkSize();
+      updateCanvasSize();
     });
     
     if (containerRef.current) {
       resizeObserver.observe(containerRef.current);
-      checkSize(); // Vérifier la taille initiale
     }
     
-    // Ajouter également un écouteur de redimensionnement de fenêtre
-    window.addEventListener('resize', checkSize);
+    const handleResize = () => updateCanvasSize();
+    window.addEventListener('resize', handleResize);
     
     return () => {
       resizeObserver.disconnect();
-      window.removeEventListener('resize', checkSize);
+      window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [updateCanvasSize]);
   
-  // Désélectionner lorsqu'on clique ailleurs que sur une table
-  const checkDeselect = (e) => {
+  // Synchroniser la sélection avec le parent
+  useEffect(() => {
+    if (selectedItem) {
+      setSelectedId(selectedItem.id);
+      setSelectedType(selectedItem.type === 'obstacle' ? 'obstacle' : 'table');
+    } else {
+      setSelectedId(null);
+      setSelectedType(null);
+    }
+  }, [selectedItem]);
+  
+  // Désélectionner lorsqu'on clique ailleurs
+  const checkDeselect = useCallback((e) => {
     const clickedOnEmpty = e.target === e.target.getStage();
     if (clickedOnEmpty) {
       setSelectedId(null);
+      setSelectedType(null);
+      if (onItemSelect) {
+        onItemSelect(null);
+      }
     }
-  };
+  }, [onItemSelect]);
   
   // Gérer la suppression avec la touche Delete
-  const handleKeyDown = (e) => {
-    if (e.keyCode === 46 && selectedId && editable) { // touche Delete
-      dispatch(deleteTable(selectedId));
+  const handleKeyDown = useCallback((e) => {
+    if (e.keyCode === 46 && selectedId && editable) {
+      if (selectedType === 'table') {
+        dispatch(deleteTable(selectedId));
+        setSnackbar({
+          open: true,
+          message: 'La table a été supprimée avec succès',
+          severity: 'success'
+        });
+      } else if (selectedType === 'obstacle') {
+        dispatch(removeObstacle(selectedId));
+        setSnackbar({
+          open: true,
+          message: 'L\'obstacle a été supprimé avec succès',
+          severity: 'success'
+        });
+      }
       setSelectedId(null);
-      setSnackbar({
-        open: true,
-        message: 'La table a été supprimée avec succès',
-        severity: 'success'
-      });
+      setSelectedType(null);
+      if (onItemSelect) {
+        onItemSelect(null);
+      }
     }
-  };
+  }, [selectedId, selectedType, editable, dispatch, onItemSelect]);
   
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedId, editable]);
+  }, [handleKeyDown]);
 
   // Gérer la fin du drag & drop d'une table
- const handleDragEnd = (tableId, newPosition) => {
-  console.log(`Canvas - handleDragEnd: tableId=${tableId}, position:`, newPosition);
-  
-  if (editable && dragMode) {
-    console.log("Dispatching updateTablePosition action");
-    dispatch(updateTablePosition({ tableId, position: newPosition }));
+  const handleTableDragEnd = useCallback((tableId, newPosition) => {
+    if (!editable || !dragMode) return;
     
-    // Notifier le parent si une fonction de callback a été fournie
+    const validatedPosition = validatePosition(newPosition.x, newPosition.y);
+    dispatch(updateTablePosition({ tableId, position: validatedPosition }));
+    
     if (onTableDragEnd) {
-      console.log("Calling onTableDragEnd callback");
-      onTableDragEnd(tableId, newPosition);
+      onTableDragEnd(tableId, validatedPosition);
     }
     
     setSnackbar({
@@ -134,10 +213,231 @@ useEffect(() => {
       message: 'Position de la table mise à jour',
       severity: 'success'
     });
-  } else {
-    console.warn(`DragEnd ignored. editable=${editable}, dragMode=${dragMode}`);
-  }
-};
+  }, [editable, dragMode, dispatch, onTableDragEnd]);
+  
+  // Gérer la fin du drag & drop d'un obstacle
+  const handleObstacleDragEnd = useCallback((obstacleId, newPosition) => {
+    if (!editable || !obstaclesDraggable) return;
+    
+    const validatedPosition = validatePosition(newPosition.x, newPosition.y);
+    dispatch(updateObstaclePosition({ obstacleId, position: validatedPosition }));
+    
+    if (propOnObstacleDragEnd) {
+      propOnObstacleDragEnd(obstacleId, validatedPosition);
+    }
+    
+    setSnackbar({
+      open: true,
+      message: 'Position de l\'obstacle mise à jour',
+      severity: 'success'
+    });
+  }, [editable, obstaclesDraggable, dispatch, propOnObstacleDragEnd]);
+
+  // Gérer la sélection d'éléments
+  const handleItemClick = useCallback((id, type) => {
+    setSelectedId(id);
+    setSelectedType(type);
+    
+    if (onItemSelect) {
+      // Trouver l'élément dans les données
+      let item = null;
+      if (type === 'table' && currentFloorPlan?.tables) {
+        item = currentFloorPlan.tables.find(t => t.id === id);
+      } else if (type === 'obstacle' && currentFloorPlan?.obstacles) {
+        item = currentFloorPlan.obstacles.find(o => o.id === id);
+      }
+      
+      if (item) {
+        onItemSelect({ ...item, type });
+      }
+    }
+  }, [onItemSelect, currentFloorPlan]);
+  
+  // ===== VALIDATION ET SÉCURISATION DES DONNÉES =====
+  
+  // Obstacles validés et sécurisés
+  const safeObstacles = useMemo(() => {
+    if (!currentFloorPlan?.obstacles || !showObstacles) return [];
+    
+    return currentFloorPlan.obstacles.filter(obstacle => {
+      return obstacle && obstacle.id && 
+             typeof obstacle.x === 'number' && 
+             typeof obstacle.y === 'number' &&
+             typeof obstacle.width === 'number' && obstacle.width > 0 &&
+             typeof obstacle.height === 'number' && obstacle.height > 0;
+    }).map(obstacle => {
+      const validatedDims = validateDimensions(obstacle.width, obstacle.height, 10);
+      const validatedPos = validatePosition(obstacle.x, obstacle.y);
+      
+      return {
+        ...obstacle,
+        ...validatedDims,
+        ...validatedPos,
+        color: validateColor(obstacle.color, '#FF6384'),
+        rotation: validateRotation(obstacle.rotation),
+        shape: obstacle.shape || 'rectangle'
+      };
+    });
+  }, [currentFloorPlan?.obstacles, showObstacles]);
+  
+  // Tables validées et sécurisées
+  const safeTables = useMemo(() => {
+    if (!currentFloorPlan?.tables) return [];
+    
+    return currentFloorPlan.tables.filter(table => {
+      return table && table.id && 
+             typeof table.x === 'number' && 
+             typeof table.y === 'number' &&
+             typeof table.width === 'number' && table.width > 0 &&
+             typeof table.height === 'number' && table.height > 0;
+    }).map(table => {
+      const validatedDims = validateDimensions(table.width, table.height, 20);
+      const validatedPos = validatePosition(table.x, table.y);
+      
+      return {
+        ...table,
+        ...validatedDims,
+        ...validatedPos,
+        color: validateColor(table.color, '#e6f7ff'),
+        rotation: validateRotation(table.rotation),
+        capacity: Math.max(Number(table.capacity) || 2, 1)
+      };
+    });
+  }, [currentFloorPlan?.tables]);
+  
+  // Périmètre validé et sécurisé
+  const safePerimeter = useMemo(() => {
+    if (!currentFloorPlan?.perimeter || !showPerimeter || !Array.isArray(currentFloorPlan.perimeter)) {
+      return [];
+    }
+    
+    return currentFloorPlan.perimeter.filter(point => {
+      return point && 
+             typeof point.x === 'number' && !isNaN(point.x) &&
+             typeof point.y === 'number' && !isNaN(point.y);
+    });
+  }, [currentFloorPlan?.perimeter, showPerimeter]);
+  
+  // ===== RENDU DES ÉLÉMENTS SÉCURISÉS =====
+  
+  // Dessiner le périmètre de manière sécurisée
+  const renderPerimeter = useMemo(() => {
+    if (safePerimeter.length < 3) return null;
+    
+    try {
+      const points = safePerimeter.flatMap(point => [point.x, point.y]);
+      
+      return (
+        <Line
+          points={points}
+          closed={true}
+          stroke={theme.palette.primary.main}
+          fill="rgba(76, 56, 136, 0.1)"
+          strokeWidth={2}
+          listening={false}
+        />
+      );
+    } catch (error) {
+      console.warn('Erreur lors du rendu du périmètre:', error);
+      return null;
+    }
+  }, [safePerimeter, theme]);
+  
+  // Obstacles rendus de manière sécurisée
+  const renderObstacles = useMemo(() => {
+    return safeObstacles.map((obstacle) => {
+      try {
+        const isSelected = selectedId === obstacle.id && selectedType === 'obstacle';
+        const isDraggable = editable && obstaclesDraggable && dragMode;
+        
+        // Props communes pour tous les obstacles
+        const commonProps = {
+          key: obstacle.id,
+          id: obstacle.id,
+          fill: obstacle.color,
+          stroke: isSelected ? theme.palette.primary.main : '#FF6384',
+          strokeWidth: isSelected ? 3 : 1,
+          draggable: isDraggable,
+          onClick: () => handleItemClick(obstacle.id, 'obstacle'),
+          onTap: () => handleItemClick(obstacle.id, 'obstacle'),
+          shadowColor: isSelected ? theme.palette.primary.main : 'transparent',
+          shadowOpacity: isSelected ? 0.3 : 0,
+          shadowOffsetX: isSelected ? 2 : 0,
+          shadowOffsetY: isSelected ? 2 : 0,
+          shadowBlur: isSelected ? 5 : 0
+        };
+        
+        if (isDraggable) {
+          commonProps.onDragEnd = (e) => {
+            const pos = e.target.position();
+            let newPosition;
+            
+            if (obstacle.shape === 'rectangle') {
+              newPosition = {
+                x: pos.x + obstacle.width/2,
+                y: pos.y + obstacle.height/2
+              };
+            } else {
+              newPosition = { x: pos.x, y: pos.y };
+            }
+            
+            handleObstacleDragEnd(obstacle.id, newPosition);
+          };
+        }
+        
+        // Rendu selon la forme
+        if (obstacle.shape === 'rectangle') {
+          return (
+            <Rect
+              {...commonProps}
+              x={obstacle.x - obstacle.width/2}
+              y={obstacle.y - obstacle.height/2}
+              width={obstacle.width}
+              height={obstacle.height}
+              rotation={obstacle.rotation}
+              offsetX={-obstacle.width/2}
+              offsetY={-obstacle.height/2}
+            />
+          );
+        } else if (obstacle.shape === 'circle') {
+          return (
+            <Circle
+              {...commonProps}
+              x={obstacle.x}
+              y={obstacle.y}
+              radius={Math.max(obstacle.width/2, 5)}
+            />
+          );
+        } else if (obstacle.shape === 'triangle') {
+          return (
+            <RegularPolygon
+              {...commonProps}
+              x={obstacle.x}
+              y={obstacle.y}
+              sides={3}
+              radius={Math.max(obstacle.width/2, 5)}
+              rotation={obstacle.rotation}
+            />
+          );
+        }
+        
+        // Forme par défaut (rectangle)
+        return (
+          <Rect
+            {...commonProps}
+            x={obstacle.x - obstacle.width/2}
+            y={obstacle.y - obstacle.height/2}
+            width={obstacle.width}
+            height={obstacle.height}
+            rotation={obstacle.rotation}
+          />
+        );
+      } catch (error) {
+        console.warn(`Erreur lors du rendu de l'obstacle ${obstacle.id}:`, error);
+        return null;
+      }
+    }).filter(Boolean);
+  }, [safeObstacles, selectedId, selectedType, editable, obstaclesDraggable, dragMode, theme, handleItemClick, handleObstacleDragEnd]);
   
   // Affichage si aucun plan n'est sélectionné
   if (!currentFloorPlan) {
@@ -180,6 +480,29 @@ useEffect(() => {
   const bgColor = isDark ? '#1E1E1E' : '#f9f9f9';
   const strokeColor = isDark ? '#333333' : '#dddddd';
   
+  // Vérification finale des dimensions avant rendu
+  if (canvasSize.width <= 0 || canvasSize.height <= 0) {
+    return (
+      <Paper
+        elevation={0}
+        ref={containerRef}
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: `${height}px`,
+          borderRadius: 2,
+          border: `1px solid ${theme.palette.divider}`,
+          backgroundColor: theme.palette.background.paper,
+        }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          Initialisation du canvas...
+        </Typography>
+      </Paper>
+    );
+  }
+  
   return (
     <Box sx={{ position: 'relative' }}>
       <Paper
@@ -202,68 +525,74 @@ useEffect(() => {
           onTouchStart={checkDeselect}
         >
           <Layer>
-            {/* Fond du plan de salle */}
+            {/* Fond du plan de salle - DIMENSIONS VALIDÉES */}
             <Rect
               x={0}
               y={0}
-              width={canvasSize.width}
-              height={canvasSize.height}
+              width={Math.max(canvasSize.width, 1)}
+              height={Math.max(canvasSize.height, 1)}
               fill={bgColor}
               stroke={strokeColor}
               strokeWidth={1}
+              listening={false}
             />
             
             {/* Grille en mode édition/déplacement */}
-            {dragMode && editable && Array.from({ length: Math.ceil(canvasSize.height / 20) }).map((_, index) => (
+            {dragMode && editable && debug && Array.from({ length: Math.ceil(canvasSize.height / 20) }).map((_, index) => (
               <Rect
                 key={`grid-h-${index}`}
                 x={0}
                 y={index * 20}
-                width={canvasSize.width}
+                width={Math.max(canvasSize.width, 1)}
                 height={1}
                 fill="transparent"
                 stroke={theme.palette.divider}
                 strokeWidth={1}
                 dash={[2, 2]}
                 opacity={0.2}
+                listening={false}
               />
             ))}
             
-            {dragMode && editable && Array.from({ length: Math.ceil(canvasSize.width / 20) }).map((_, index) => (
+            {dragMode && editable && debug && Array.from({ length: Math.ceil(canvasSize.width / 20) }).map((_, index) => (
               <Rect
                 key={`grid-v-${index}`}
                 x={index * 20}
                 y={0}
                 width={1}
-                height={canvasSize.height}
+                height={Math.max(canvasSize.height, 1)}
                 fill="transparent"
                 stroke={theme.palette.divider}
                 strokeWidth={1}
                 dash={[2, 2]}
                 opacity={0.2}
+                listening={false}
               />
             ))}
             
-            {/* Affichage des tables */}
-            {currentFloorPlan.tables && currentFloorPlan.tables.map((table) => (
-              <TableShape
-                key={table.id}
-                tableData={table}
-                isSelected={table.id === selectedId}
-                onSelect={() => setSelectedId(table.id)}
-                onChange={(newAttrs) => {
-                  dispatch(updateTable({
-                    ...table,
-                    ...newAttrs
-                  }));
-                }}
-                draggable={editable && dragMode}
-                isDarkMode={isDark}
-                onDragEnd={(newPosition) => handleDragEnd(table.id, newPosition)}
-                dragBorderColor={theme.palette.primary.main}
-                showDragHandles={dragMode}
-              />
-            ))}
+            {/* Affichage du périmètre */}
+            {renderPerimeter}
+            
+            {/* Affichage des obstacles SÉCURISÉS */}
+            <Group>
+              {renderObstacles}
+            </Group>
+            
+            {/* Affichage des tables SÉCURISÉES */}
+            <Group>
+              {safeTables.map((table) => (
+                <TableShape
+                  key={table.id}
+                  table={table}
+                  isSelected={table.id === selectedId && selectedType === 'table'}
+                  onSelect={() => handleItemClick(table.id, 'table')}
+                  draggable={editable && dragMode}
+                  isDarkMode={isDark}
+                  onDragEnd={(newPosition) => handleTableDragEnd(table.id, newPosition)}
+                  dragBorderColor={theme.palette.primary.main}
+                />
+              ))}
+            </Group>
           </Layer>
         </Stage>
         
@@ -289,24 +618,6 @@ useEffect(() => {
           </Box>
         )}
       </Paper>
-        {/*Montrer si drag actif */}
-      {dragMode && (
-  <Box
-    sx={{
-      position: 'absolute',
-      top: 12,
-      left: 12,
-      zIndex: 10,
-      padding: '5px 10px',
-      backgroundColor: 'red',
-      color: 'white',
-      borderRadius: '4px',
-      fontWeight: 'bold'
-    }}
-  >
-    MODE DRAG ACTIF
-  </Box>
-)}
       
       {/* Message de succès */}
       <Snackbar
@@ -330,4 +641,4 @@ useEffect(() => {
   );
 };
 
-export default Canvas;
+export default React.memo(Canvas);
