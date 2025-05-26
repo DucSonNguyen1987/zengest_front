@@ -44,7 +44,7 @@ export const checkUserHasRole = async (userId, roleId) => {
   try {
     const response = await axiosInstance.get(`/users/${userId}/roles/${roleId}`);
     return response.data.hasRole;
-  } catch (error) {
+  } catch (_error) {
     if (error.response && error.response.status === 404) {
       return false;
     }
@@ -74,3 +74,30 @@ export const removeRoleFromUser = async (userId, roleId) => {
   return response.data;
 };
 
+// Mise à jour de src/api/index.js pour inclure les nouveaux services
+// Ajoutez ces lignes à votre fichier index.js existant:
+
+/*
+// Imported from userRole.js
+import {
+  getAllUserRoles,
+  getUserRoleById,
+  getUsersByRole,
+  checkUserHasRole,
+  assignRoleToUser,
+  removeRoleFromUser
+} from './userRole';
+
+// Export dans la section appropriée
+export {
+  // ...autres exports
+  
+  // Services de gestion des rôles
+  getAllUserRoles,
+  getUserRoleById,
+  getUsersByRole,
+  checkUserHasRole,
+  assignRoleToUser,
+  removeRoleFromUser,
+};
+*/
