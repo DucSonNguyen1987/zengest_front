@@ -1,257 +1,275 @@
 import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Box,
   TextField,
   Button,
   Typography,
-  FormControlLabel,
-  Checkbox,
+  Paper,
+  Alert,
   InputAdornment,
   IconButton,
-  Link as MuiLink
+  Divider,
+  CircularProgress
 } from '@mui/material';
 import {
   Visibility,
   VisibilityOff,
-  Email as EmailIcon,
-  Lock as LockIcon
+  Email,
+  Lock,
+  Login as LoginIcon
 } from '@mui/icons-material';
-import { alpha, useTheme } from '@mui/material/styles';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useTheme, alpha } from '@mui/material/styles';
 import { useColorMode } from '../../context/ThemeContext';
 
 const LoginForm = () => {
   const theme = useTheme();
   const { mode } = useColorMode();
   const isDark = mode === 'dark';
-  
-  // Utilisation du hook d'authentification
-  const { login, loading } = useAuth();
-  
-  // États du formulaire
-  const [showPassword, setShowPassword] = useState(false);
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
+  // ✅ États locaux définis
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
-    remember: false
+    password: ''
   });
-  
-  // Fonction pour gérer les changements dans les champs du formulaire
+  const [loading, setLoading] = useState(false); // ✅ setLoading défini
+  const [error, setError] = useState(''); // ✅ setError défini
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Gestion des changements dans les inputs
   const handleChange = (e) => {
-    const { name, value, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: name === 'remember' ? checked : value,
-    });
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Effacer l'erreur quand l'utilisateur tape
+    if (error) {
+      setError('');
+    }
   };
-  
-  // Fonction pour basculer la visibilité du mot de passe
+
+  // Basculer la visibilité du mot de passe
   const handleTogglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
 
-  // Fonction appelée à la soumission du formulaire
+  // ✅ Gestionnaire de soumission corrigé avec toutes les variables définies
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validation basique
+    if (!formData.email || !formData.password) {
+      setError('Veuillez remplir tous les champs');
+      return;
+    }
+
     try {
+      setLoading(true); // ✅ setLoading disponible
+      setError(''); // ✅ setError disponible
+      
       await login(formData);
-      // La redirection est gérée par le composant parent (page Login)
-    } catch (_error) {
-      console.error('Login error:', error);
+      
+      // Navigation après connexion réussie
+      navigate('/dashboard'); // ✅ navigate disponible
+      
+    } catch (err) { // ✅ CORRECTION: Utiliser 'err' et non 'error'
+      console.error('Erreur de connexion:', err); // ✅ CORRECTION: Utiliser 'err'
+      setError(err.message || 'Erreur de connexion'); // ✅ setError disponible
+    } finally {
+      setLoading(false); // ✅ setLoading disponible
     }
   };
 
   return (
-    <Box sx={{ width: '100%' }}>
-      <Typography 
-        variant="h5" 
-        component="h2" 
-        align="center" 
-        gutterBottom 
-        sx={{ 
-          mb: 3,
-          fontWeight: 600,
-          color: theme.palette.text.primary
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: isDark
+          ? `linear-gradient(135deg, ${theme.palette.background.default} 0%, ${alpha(theme.palette.primary.dark, 0.1)} 100%)`
+          : `linear-gradient(135deg, ${alpha(theme.palette.primary.light, 0.1)} 0%, ${theme.palette.background.default} 100%)`,
+        padding: 2
+      }}
+    >
+      <Paper
+        elevation={isDark ? 8 : 4}
+        sx={{
+          p: 4,
+          width: '100%',
+          maxWidth: 400,
+          backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.9 : 0.95),
+          backdropFilter: 'blur(10px)',
+          borderRadius: 3,
+          border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
         }}
       >
-        Connexion
-      </Typography>
-
-      <Box 
-        component="form" 
-        onSubmit={handleSubmit} 
-        noValidate
-      >
-        {/* Champ Email */}
-        <TextField
-          margin="normal"
-          required
-          fullWidth
-          id="email"
-          label="Adresse email"
-          name="email"
-          autoComplete="email"
-          autoFocus
-          value={formData.email}
-          onChange={handleChange}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <EmailIcon color="primary" />
-              </InputAdornment>
-            ),
-          }}
-          sx={{ 
-            mb: 2,
-            '& .MuiOutlinedInput-root': {
-              backdropFilter: 'blur(4px)',
-              backgroundColor: isDark 
-                ? alpha(theme.palette.background.paper, 0.4)
-                : alpha(theme.palette.background.paper, 0.6),
-              '&:hover': {
-                backgroundColor: isDark 
-                  ? alpha(theme.palette.background.paper, 0.5)
-                  : alpha(theme.palette.background.paper, 0.7),
-              },
-              '&.Mui-focused': {
-                backgroundColor: isDark 
-                  ? alpha(theme.palette.background.paper, 0.6)
-                  : alpha(theme.palette.background.paper, 0.8),
-              }
-            }
-          }}
-        />
-
-        {/* Champ Mot de passe */}
-        <TextField
-          margin="normal"
-          required
-          fullWidth
-          name="password"
-          label="Mot de passe"
-          type={showPassword ? 'text' : 'password'}
-          id="password"
-          autoComplete="current-password"
-          value={formData.password}
-          onChange={handleChange}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <LockIcon color="primary" />
-              </InputAdornment>
-            ),
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  aria-label="toggle password visibility"
-                  onClick={handleTogglePasswordVisibility}
-                  edge="end"
-                >
-                  {showPassword ? <VisibilityOff /> : <Visibility />}
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-          sx={{ 
-            mb: 2,
-            '& .MuiOutlinedInput-root': {
-              backdropFilter: 'blur(4px)',
-              backgroundColor: isDark 
-                ? alpha(theme.palette.background.paper, 0.4)
-                : alpha(theme.palette.background.paper, 0.6),
-              '&:hover': {
-                backgroundColor: isDark 
-                  ? alpha(theme.palette.background.paper, 0.5)
-                  : alpha(theme.palette.background.paper, 0.7),
-              },
-              '&.Mui-focused': {
-                backgroundColor: isDark 
-                  ? alpha(theme.palette.background.paper, 0.6)
-                  : alpha(theme.palette.background.paper, 0.8),
-              }
-            }
-          }}
-        />
-
-        {/* Option pour "se souvenir de moi" et "Mot de passe oublié" */}
-        <Box sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          mb: 3
-        }}>
-          <FormControlLabel
-            control={
-              <Checkbox 
-                name="remember"
-                checked={formData.remember}
-                onChange={handleChange}
-                color="primary"
-              />
-            }
-            label="Se souvenir de moi"
-          />
-          
-          <MuiLink 
-            component={Link} 
-            to="/forgot-password" 
-            variant="body2"
-            underline="hover"
-            sx={{ 
-              color: theme.palette.primary.main
+        {/* En-tête */}
+        <Box sx={{ textAlign: 'center', mb: 3 }}>
+          <Typography
+            variant="h4"
+            component="h1"
+            sx={{
+              fontWeight: 700,
+              color: theme.palette.primary.main,
+              mb: 1
             }}
           >
-            Mot de passe oublié?
-          </MuiLink>
-        </Box>
-
-        {/* Bouton de soumission */}
-        <Button
-          type="submit"
-          fullWidth
-          variant="contained"
-          color="primary"
-          disabled={loading}
-          sx={{ 
-            py: 1.5,
-            mb: 3,
-            borderRadius: 2,
-            boxShadow: isDark 
-              ? `0 4px 14px ${alpha(theme.palette.primary.main, 0.4)}`
-              : `0 4px 14px ${alpha(theme.palette.primary.main, 0.3)}`,
-            background: isDark
-              ? `linear-gradient(90deg, ${alpha(theme.palette.primary.main, 0.9)}, ${alpha(theme.palette.primary.light, 0.9)})`
-              : `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
-            '&:hover': {
-              boxShadow: isDark 
-                ? `0 6px 20px ${alpha(theme.palette.primary.main, 0.6)}`
-                : `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
-            }
-          }}
-        >
-          {loading ? 'Connexion...' : 'Connexion'}
-        </Button>
-
-        {/* Lien vers la page d'inscription */}
-        <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-            Pas encore de compte?{' '}
-            <MuiLink 
-              component={Link} 
-              to="/register" 
-              variant="body2" 
-              underline="hover"
-              sx={{ 
-                fontWeight: 'medium',
-                color: theme.palette.primary.main
-              }}
-            >
-              S'inscrire
-            </MuiLink>
+            Connexion
+          </Typography>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+          >
+            Connectez-vous à votre compte
           </Typography>
         </Box>
-      </Box>
+
+        {/* Affichage de l'erreur */}
+        {error && (
+          <Alert
+            severity="error"
+            sx={{ mb: 2 }}
+            onClose={() => setError('')}
+          >
+            {error}
+          </Alert>
+        )}
+
+        {/* Formulaire */}
+        <Box component="form" onSubmit={handleSubmit} noValidate>
+          {/* Champ email */}
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="email"
+            label="Adresse email"
+            name="email"
+            autoComplete="email"
+            autoFocus
+            value={formData.email}
+            onChange={handleChange}
+            disabled={loading}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Email color="action" />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ mb: 2 }}
+          />
+
+          {/* Champ mot de passe */}
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            name="password"
+            label="Mot de passe"
+            type={showPassword ? 'text' : 'password'}
+            id="password"
+            autoComplete="current-password"
+            value={formData.password}
+            onChange={handleChange}
+            disabled={loading}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Lock color="action" />
+                </InputAdornment>
+              ),
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label="toggle password visibility"
+                    onClick={handleTogglePasswordVisibility}
+                    edge="end"
+                    disabled={loading}
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+            sx={{ mb: 3 }}
+          />
+
+          {/* Bouton de connexion */}
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            disabled={loading}
+            sx={{
+              py: 1.5,
+              mb: 2,
+              fontSize: '1rem',
+              fontWeight: 600,
+              borderRadius: 2,
+              position: 'relative'
+            }}
+          >
+            {loading ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CircularProgress size={20} color="inherit" />
+                <span>Connexion...</span>
+              </Box>
+            ) : (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LoginIcon />
+                <span>Se connecter</span>
+              </Box>
+            )}
+          </Button>
+
+          <Divider sx={{ my: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              ou
+            </Typography>
+          </Divider>
+
+          {/* Lien vers l'inscription */}
+          <Box sx={{ textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              Pas encore de compte ?{' '}
+              <Link
+                to="/register"
+                style={{
+                  color: theme.palette.primary.main,
+                  textDecoration: 'none',
+                  fontWeight: 500
+                }}
+              >
+                S'inscrire
+              </Link>
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Comptes de test */}
+        <Box sx={{ mt: 3, p: 2, backgroundColor: alpha(theme.palette.info.main, 0.1), borderRadius: 2 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+            Comptes de test :
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            • Admin: admin@restaurant.com / password123
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            • Manager: marie@restaurant.com / password123
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            • Staff: jean@restaurant.com / password123
+          </Typography>
+        </Box>
+      </Paper>
     </Box>
   );
 };

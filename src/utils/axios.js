@@ -40,7 +40,7 @@ const axiosInstance = axios.create({
  * - Ajouter automatiquement le token JWT aux en-têtes si disponible
  */
 axiosInstance.interceptors.request.use(
-  (_config) => {
+  (config) => { // ✅ CORRECTION: Retirer l'underscore
     // Récupération du token JWT depuis le stockage local via notre utilitaire
     const token = getToken();
     
@@ -109,31 +109,3 @@ if (ENABLE_MOCKS) {
 
 // Exportation de l'instance Axios configurée pour utilisation dans toute l'application
 export default axiosInstance;
-
-/**
- * Utilisation typique dans l'application:
- * 
- * import axiosInstance from '../utils/axios';
- * 
- * // Faire une requête GET
- * const getData = async () => {
- *   try {
- *     const response = await axiosInstance.get('/endpoint');
- *     return response.data;
- *   } catch (_error) {
- *     console.error('Erreur:', error);
- *     throw error;
- *   }
- * };
- * 
- * // Faire une requête POST
- * const createData = async (data) => {
- *   try {
- *     const response = await axiosInstance.post('/endpoint', data);
- *     return response.data;
- *   } catch (_error) {
- *     console.error('Erreur:', error);
- *     throw error;
- *   }
- * };
- */
