@@ -1,4 +1,3 @@
-
 /**
  * Ce fichier configure une instance Axios personnalisée avec:
  * - Configuration de base (URL, headers)
@@ -14,6 +13,14 @@ import setupMock from './mockAdapter';     // Configuration des mocks (utilisé 
 
 // Récupération de l'URL de l'API depuis les variables d'environnement ou utilisation d'une URL par défaut
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const ENABLE_MOCKS = import.meta.env.VITE_ENABLE_MOCKS === 'true' || import.meta.env.DEV;
+
+// Debug des variables d'environnement
+console.log('🔧 Configuration Axios:');
+console.log('- API_URL:', API_URL);
+console.log('- ENABLE_MOCKS:', ENABLE_MOCKS);
+console.log('- NODE_ENV:', import.meta.env.MODE);
+console.log('- DEV mode:', import.meta.env.DEV);
 
 /**
  * Création d'une instance Axios personnalisée
@@ -24,6 +31,7 @@ const axiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',  // En-tête par défaut pour toutes les requêtes
   },
+  timeout: 10000, // Timeout de 10 secondes
 });
 
 /**
@@ -41,11 +49,17 @@ axiosInstance.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
+    // Log pour debug
+    console.log('📤 Requête:', config.method?.toUpperCase(), config.url);
+    
     // Retour de la configuration modifiée
     return config;
   },
   // En cas d'erreur lors de la préparation de la requête
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('❌ Erreur de requête:', error);
+    return Promise.reject(error);
+  }
 );
 
 /**
@@ -56,10 +70,15 @@ axiosInstance.interceptors.request.use(
  */
 axiosInstance.interceptors.response.use(
   // Pour les réponses réussies, renvoyer simplement la réponse
-  (response) => response,
+  (response) => {
+    console.log('📥 Réponse:', response.status, response.config.url);
+    return response;
+  },
   
   // Pour les erreurs, vérifier si c'est une erreur 401 (non autorisé)
   (error) => {
+    console.error('❌ Erreur de réponse:', error.response?.status, error.config?.url);
+    
     if (error.response && error.response.status === 401) {
       // Si erreur 401, supprimer le token et rediriger vers la page de login
       removeToken();
@@ -78,12 +97,14 @@ axiosInstance.interceptors.response.use(
  * Configuration des mocks en mode développement
  * Permet de développer le frontend sans avoir besoin d'un backend fonctionnel
  */
-if (import.meta.env.DEV) {
+if (ENABLE_MOCKS) {
   // Afficher un message dans la console pour indiquer que les mocks sont activés
-  console.log('API Mock activé en environnement de développement');
+  console.log('🎭 API Mock activé en environnement de développement');
   
   // Configurer les mocks avec notre instance Axios
   setupMock(axiosInstance);
+} else {
+  console.log('🌐 Utilisation de l\'API réelle:', API_URL);
 }
 
 // Exportation de l'instance Axios configurée pour utilisation dans toute l'application

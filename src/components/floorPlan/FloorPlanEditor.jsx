@@ -241,7 +241,7 @@ const FloorPlanEditor = ({
       setObstacleHeight(categoryData.defaultHeight);
       setObstacleRotation(0);
     }
-  }, []);
+  }, [obstacleCategories]);
 
   // Fonction pour vérifier si un point est dans un polygone
   const isPointInPolygon = useCallback((point, polygon) => {
@@ -539,9 +539,23 @@ const FloorPlanEditor = ({
   }, []);
   
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }} {...rest}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', width: '100%' }}>
-        <div style={{ flex: '0 0 300px', width: '300px' }}>
+    <Box 
+      sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        width: '100%' 
+      }} 
+      {...rest}
+    >
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: 2, 
+          width: '100%' 
+        }}
+      >
+        <Box sx={{ flex: '0 0 300px', width: '300px' }}>
           <Card elevation={isDarkMode ? 4 : 2} sx={{ 
             height: '100%',
             backgroundColor: themeStyles.cardBackground,
@@ -560,7 +574,7 @@ const FloorPlanEditor = ({
               }}
             />
             <CardContent>
-              <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '16px' }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 2 }}>
                 {/* Mode d'édition SIMPLIFIÉ */}
                 <Box>
                   <Typography variant="subtitle2" gutterBottom>
@@ -575,28 +589,28 @@ const FloorPlanEditor = ({
                       sx={{ mb: 1 }}
                     >
                       <MenuItem value="move">
-                        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '4px' }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 0.5 }}>
                           <DragIcon fontSize="small" />
                           <Typography>Déplacer & Modifier</Typography>
-                        </div>
+                        </Box>
                       </MenuItem>
                       <MenuItem value="addTable">
-                        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '4px' }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 0.5 }}>
                           <AddIcon fontSize="small" />
                           <Typography>Ajouter table</Typography>
-                        </div>
+                        </Box>
                       </MenuItem>
                       <MenuItem value="addObstacle">
-                        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '4px' }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 0.5 }}>
                           <AddIcon fontSize="small" />
                           <Typography>Ajouter obstacle</Typography>
-                        </div>
+                        </Box>
                       </MenuItem>
                       <MenuItem value="drawPerimeter">
-                        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '4px' }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 0.5 }}>
                           <BorderOuterIcon fontSize="small" />
                           <Typography>Dessiner périmètre</Typography>
-                        </div>
+                        </Box>
                       </MenuItem>
                     </Select>
                   </FormControl>
@@ -644,7 +658,7 @@ const FloorPlanEditor = ({
                     </Box>
 
                     {/* Modification des propriétés communes */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       
                       {/* Pour les tables */}
                       {(selectedItem.type === 'table' || selectedItem.capacity !== undefined) && (
@@ -703,10 +717,10 @@ const FloorPlanEditor = ({
                             >
                               {Object.entries(obstacleCategories).map(([key, category]) => (
                                 <MenuItem key={key} value={key}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                     <span>{category.icon}</span>
                                     <Typography variant="body2">{category.name}</Typography>
-                                  </div>
+                                  </Box>
                                 </MenuItem>
                               ))}
                             </Select>
@@ -857,7 +871,7 @@ const FloorPlanEditor = ({
                       >
                         Supprimer
                       </Button>
-                    </div>
+                    </Box>
                   </Paper>
                 )}
                 
@@ -867,7 +881,7 @@ const FloorPlanEditor = ({
                     <Typography variant="subtitle2" gutterBottom>
                       Nouvelle table
                     </Typography>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <TextField
                         label="Nom de la table"
                         value={tableLabel}
@@ -889,16 +903,16 @@ const FloorPlanEditor = ({
                           label="Forme"
                         >
                           <MenuItem value="rectangle">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <SquareIcon fontSize="small" />
                               <Typography>Rectangle</Typography>
-                            </div>
+                            </Box>
                           </MenuItem>
                           <MenuItem value="circle">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <CircleIcon fontSize="small" />
                               <Typography>Cercle</Typography>
-                            </div>
+                            </Box>
                           </MenuItem>
                         </Select>
                       </FormControl>
@@ -1004,7 +1018,7 @@ const FloorPlanEditor = ({
                           </Box>
                         </Popover>
                       </Box>
-                    </div>
+                    </Box>
                   </Box>
                 )}
                 
@@ -1014,7 +1028,7 @@ const FloorPlanEditor = ({
                     <Typography variant="subtitle2" gutterBottom>
                       Nouvel obstacle
                     </Typography>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <FormControl fullWidth size="small">
                         <InputLabel id="obstacle-category-label">Type d'obstacle</InputLabel>
                         <Select
@@ -1029,15 +1043,15 @@ const FloorPlanEditor = ({
                         >
                           {Object.entries(obstacleCategories).map(([key, category]) => (
                             <MenuItem key={key} value={key}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <span>{category.icon}</span>
-                                <div>
+                                <Box>
                                   <Typography variant="body2">{category.name}</Typography>
                                   <Typography variant="caption" color="text.secondary">
                                     {category.description}
                                   </Typography>
-                                </div>
-                              </div>
+                                </Box>
+                              </Box>
                             </MenuItem>
                           ))}
                         </Select>
@@ -1068,7 +1082,7 @@ const FloorPlanEditor = ({
                           disabled={!editable}
                         />
                       </Box>
-                    </div>
+                    </Box>
                   </Box>
                 )}
                 
@@ -1113,9 +1127,9 @@ const FloorPlanEditor = ({
                                 </ListItemIcon>
                                 <ListItemText 
                                   primary={
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                       <span>{table.label || `Table ${table.id.split('-')[1]}`}</span>
-                                      <span style={{ 
+                                      <Box sx={{ 
                                         fontSize: '0.8rem', 
                                         background: isDarkMode ? theme.palette.primary.dark : theme.palette.primary.main, 
                                         color: 'white', 
@@ -1124,8 +1138,8 @@ const FloorPlanEditor = ({
                                         boxShadow: isDarkMode ? `0 2px 4px ${alpha(theme.palette.common.black, 0.3)}` : 'none'
                                       }}>
                                         {table.capacity}p
-                                      </span>
-                                    </div>
+                                      </Box>
+                                    </Box>
                                   }
                                   secondary={`${Math.round(table.x)},${Math.round(table.y)} | ${table.width}×${table.height}px`}
                                 />
@@ -1160,7 +1174,7 @@ const FloorPlanEditor = ({
                                 </ListItemIcon>
                                 <ListItemText 
                                   primary={
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                       {obstacle.category && obstacleCategories[obstacle.category] && (
                                         <span>{obstacleCategories[obstacle.category].icon}</span>
                                       )}
@@ -1170,7 +1184,7 @@ const FloorPlanEditor = ({
                                           'Obstacle'
                                         } {obstacle.id.split('-')[1]}
                                       </span>
-                                    </div>
+                                    </Box>
                                   }
                                   secondary={`${Math.round(obstacle.x)},${Math.round(obstacle.y)} | ${obstacle.width}×${obstacle.height}px`}
                                 />
@@ -1190,7 +1204,7 @@ const FloorPlanEditor = ({
                   <Typography variant="subtitle2" gutterBottom>
                     Capacité de la salle
                   </Typography>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <TextField
                       label="Limite de capacité"
                       type="number"
@@ -1223,7 +1237,7 @@ const FloorPlanEditor = ({
                         Capacité actuelle: {currentCapacity} / {capacityLimit}
                       </Typography>
                     </Paper>
-                  </div>
+                  </Box>
                 </Box>
                 
                 <Divider />
@@ -1255,12 +1269,12 @@ const FloorPlanEditor = ({
                 >
                   Enregistrer le plan
                 </Button>
-              </div>
+              </Box>
             </CardContent>
           </Card>
-        </div>
+        </Box>
         
-        <div style={{ flex: '1 1 auto', minWidth: '500px' }}>
+        <Box sx={{ flex: '1 1 auto', minWidth: '500px' }}>
           <Box
             sx={{
               border: `2px solid ${themeStyles.canvasContainer.borderColor}`,
@@ -1282,8 +1296,8 @@ const FloorPlanEditor = ({
             ref={canvasRef}
           >
             {isCanvasReady ? (
-              <div
-                style={{
+              <Box
+                sx={{
                   position: 'absolute',
                   top: 0,
                   left: 0,
@@ -1306,7 +1320,7 @@ const FloorPlanEditor = ({
                   debug={false}
                   obstaclesDraggable={dragMode}
                 />
-              </div>
+              </Box>
             ) : (
               <Box
                 sx={{
@@ -1352,8 +1366,8 @@ const FloorPlanEditor = ({
               </Box>
             )}
           </Box>
-        </div>
-      </div>
+        </Box>
+      </Box>
       
       {/* Notifications */}
       <Snackbar

@@ -3,7 +3,7 @@ import {
   Box, 
   TextField, 
   Button, 
-  Grid, 
+  Grid,
   Paper, 
   Typography
 } from '@mui/material';
@@ -80,58 +80,63 @@ const FloorPlanForm = ({ onSubmit, initialValues, isEdit = false }) => {
         onSubmit={handleSubmit} 
         noValidate
       >
+        {/* Grid v1 sans les props obsolètes */}
         <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <TextField
-              required
-              fullWidth
-              id="name"
-              name="name"
-              label="Nom du plan"
-              placeholder="Ex: Salle principale"
-              value={formValues.name}
-              onChange={handleChange}
-              variant="outlined"
-              InputProps={{
-                sx: {
-                  backdropFilter: 'blur(4px)',
-                  backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.4 : 0.6),
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.5 : 0.7),
-                  },
-                  '&.Mui-focused': {
-                    backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.6 : 0.8),
+          <Grid container>
+            <Grid sx={{ width: '100%' }}>
+              <TextField
+                required
+                fullWidth
+                id="name"
+                name="name"
+                label="Nom du plan"
+                placeholder="Ex: Salle principale"
+                value={formValues.name}
+                onChange={handleChange}
+                variant="outlined"
+                InputProps={{
+                  sx: {
+                    backdropFilter: 'blur(4px)',
+                    backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.4 : 0.6),
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.5 : 0.7),
+                    },
+                    '&.Mui-focused': {
+                      backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.6 : 0.8),
+                    }
                   }
-                }
-              }}
-            />
+                }}
+              />
+            </Grid>
           </Grid>
           
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              id="description"
-              name="description"
-              label="Description"
-              placeholder="Description du plan de salle"
-              value={formValues.description}
-              onChange={handleChange}
-              variant="outlined"
-              multiline
-              rows={4}
-              InputProps={{
-                sx: {
-                  backdropFilter: 'blur(4px)',
-                  backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.4 : 0.6),
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.5 : 0.7),
-                  },
-                  '&.Mui-focused': {
-                    backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.6 : 0.8),
+          <Grid container sx={{ mt: 2 }}>
+            <Grid sx={{ width: '100%' }}>
+              <TextField
+                fullWidth
+                id="description"
+                name="description"
+                label="Description"
+                placeholder="Description du plan de salle"
+                value={formValues.description}
+                onChange={handleChange}
+                variant="outlined"
+                multiline
+                rows={4}
+                InputProps={{
+                  sx: {
+                    backdropFilter: 'blur(4px)',
+                    backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.4 : 0.6),
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.5 : 0.7),
+                    },
+                    '&.Mui-focused': {
+                      backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.6 : 0.8),
+                    }
                   }
-                }
-              }}
-            />
+                }}
+              />
+            </Grid>
           </Grid>
         </Grid>
         

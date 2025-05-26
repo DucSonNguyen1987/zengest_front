@@ -1,8 +1,12 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { transformMockDataToFloorPlans } from '../../utils/mockDataTransformer.js';
+
+const initialFloorPlans = transformMockDataToFloorPlans();
+
 
 const initialState = {
-  floorPlans: [],
-  currentFloorPlan: null,
+  floorPlans: initialFloorPlans,
+  currentFloorPlan: initialFloorPlans[0] || null, // Sélectionner la première salle par défaut
   loading: false,
   error: null
 };
@@ -87,6 +91,23 @@ const floorPlanSlice = createSlice({
     deleteFloorPlanFailure(state, action) {
       state.loading = false;
       state.error = action.payload;
+    },
+
+     // Nouvelle action pour réinitialiser avec les données mockées
+    initializeMockData(state) {
+      const mockFloorPlans = transformMockDataToFloorPlans();
+      state.floorPlans = mockFloorPlans;
+      state.currentFloorPlan = mockFloorPlans[0] || null;
+      state.loading = false;
+      state.error = null;
+    },
+    
+    // Action pour changer de salle
+    switchFloorPlan(state, action) {
+      const floorPlan = state.floorPlans.find(plan => plan.id === action.payload);
+      if (floorPlan) {
+        state.currentFloorPlan = floorPlan;
+      }
     },
     
     // Ajouter une table au plan courant
@@ -220,7 +241,9 @@ const floorPlanSlice = createSlice({
     // Réinitialiser la sélection courante
     clearCurrentFloorPlan(state) {
       state.currentFloorPlan = null;
-    }
+    },
+
+    
   }
 });
 
@@ -252,7 +275,10 @@ export const {
   removeObstacle,
   updateObstaclePosition,
   setPerimeter,
-  updateCapacityLimit
+  updateCapacityLimit,
+  //  Initialisation des Mock Datas
+   initializeMockData,
+   switchFloorPlan
 } = floorPlanSlice.actions;
 
 export default floorPlanSlice.reducer;

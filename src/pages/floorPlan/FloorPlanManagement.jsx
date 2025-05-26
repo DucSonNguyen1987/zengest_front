@@ -58,6 +58,7 @@ import { hasPermission, PERMISSIONS } from '../../utils/permissions';
 // Importez le nouveau service
 import floorPlanService from '../../services/floorPlanService';
 import FloorPlanEditor from '../../components/floorPlan/FloorPlanEditor';
+import ErrorBoundary from '../../components/common/ErrorBoundary';
 const { Content, Sider } = Layout;
 const { Title, Text } = Typography;
 
@@ -407,8 +408,15 @@ const canDelete = isDevelopment ? true : hasPermission(user?.role, PERMISSIONS.D
                 <Canvas 
                   editable={canEdit} 
                   height={isMobile ? 300 : 400} 
+                  width={800}
                   dragMode={dragMode}
                   onTableDragEnd={handleTableDragEnd}
+                  // Props pour l'affichage principal (pas d'édition de périmètre ici)
+                  perimeterEditMode={false}
+                  // NOUVELLES PROPS POUR CORRIGER LE PROBLÈME DANS LA VUE PRINCIPALE
+                  fixedSize={false}
+                  maxWidth={1200}
+                  maxHeight={600}
                 />
               </div>
               
@@ -471,31 +479,46 @@ const canDelete = isDevelopment ? true : hasPermission(user?.role, PERMISSIONS.D
         </Drawer>
       </Content>
       
-     {/* Modal pour créer/éditer un plan */}
-<Modal
-  title={isEditingFloorPlan ? "Modifier le plan de salle" : "Créer un nouveau plan de salle"}
-  open={floorPlanModalVisible}
-  onCancel={() => setFloorPlanModalVisible(false)}
-  footer={null}
-  width={1200} // Augmenter la largeur pour accommoder l'éditeur amélioré
->
-  {isEditingFloorPlan ? (
-    <FloorPlanEditor 
-      currentFloorPlan={currentFloorPlan}
-      editable={canEdit}
-      onSaveFloorPlan={(updatedPlan) => {
-        handleUpdateFloorPlan(updatedPlan);
-        setFloorPlanModalVisible(false);
-      }}
-    />
-  ) : (
-    <FloorPlanForm
-      onSubmit={handleCreateFloorPlan}
-      initialValues={null}
-      isEdit={false}
-    />
-  )}
-</Modal>
+      {/* Modal pour créer/éditer un plan - RESTAURÉE AVEC TOUTES LES FONCTIONNALITÉS */}
+      <Modal
+        title={isEditingFloorPlan ? "Modifier le plan de salle" : "Créer un nouveau plan de salle"}
+        open={floorPlanModalVisible}
+        onCancel={() => setFloorPlanModalVisible(false)}
+        footer={null}
+        width={1200} // Largeur augmentée pour l'éditeur complet
+        style={{ top: 20 }}
+        styles={{
+          body: { 
+            maxHeight: '85vh', 
+            overflowY: 'auto',
+            padding: '16px'
+          }
+        }}
+      >
+        {isEditingFloorPlan ? (
+          // Utilisation du FloorPlanEditor complet pour l'édition
+          <ErrorBoundary>
+            <FloorPlanEditor 
+              currentFloorPlan={currentFloorPlan}
+              editable={canEdit}
+              onSaveFloorPlan={(updatedPlan) => {
+                handleUpdateFloorPlan(updatedPlan);
+                setFloorPlanModalVisible(false);
+              }}
+            />
+          </ErrorBoundary>
+        ) : (
+          // Formulaire amélioré pour la création avec configuration avancée
+          <ErrorBoundary>
+            <FloorPlanForm
+              onSubmit={handleCreateFloorPlan}
+              initialValues={null}
+              isEdit={false}
+              showAdvancedConfig={true} // Activer la configuration avancée pour la création
+            />
+          </ErrorBoundary>
+        )}
+      </Modal>
       
       {/* Modal pour ajouter/éditer une table */}
       <Modal
@@ -506,12 +529,19 @@ const canDelete = isDevelopment ? true : hasPermission(user?.role, PERMISSIONS.D
           setCurrentTable(null);
         }}
         footer={null}
+        styles={{
+          body: { 
+            padding: '16px'
+          }
+        }}
       >
-        <TableForm
-          onSubmit={currentTable ? handleUpdateTable : handleAddTable}
-          initialValues={currentTable}
-          isEdit={!!currentTable}
-        />
+        <ErrorBoundary>
+          <TableForm
+            onSubmit={currentTable ? handleUpdateTable : handleAddTable}
+            initialValues={currentTable}
+            isEdit={!!currentTable}
+          />
+        </ErrorBoundary>
       </Modal>
     </Layout>
   );

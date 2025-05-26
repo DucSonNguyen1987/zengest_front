@@ -34,17 +34,22 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        console.log('🔐 Initialisation de l\'authentification...');
+        
         if (isTokenValid()) {
+          console.log('✅ Token valide trouvé, récupération des données utilisateur...');
           // Utilisation de getToken() au lieu d'accéder directement au localStorage
           const userData = await getCurrentUser();
           setUser(userData);
+          console.log('👤 Utilisateur connecté:', userData);
         } else {
+          console.log('❌ Token invalide ou inexistant');
           // Utilisation de removeToken() de manière cohérente
           removeToken();
           setUser(null);
         }
       } catch (err) {
-        console.error('Failed to initialize auth:', err);
+        console.error('❌ Échec de l\'initialisation de l\'authentification:', err);
         removeToken();
         setUser(null);
       } finally {
@@ -55,20 +60,55 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
-  // Fonction de login
+  // Fonction de login avec gestion d'erreur améliorée
   const login = async (credentials) => {
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log('🔑 Tentative de connexion pour:', credentials.email);
+      
       const response = await loginUser(credentials);
+      
+      console.log('✅ Connexion réussie:', response);
+      
       // Utilisation de setToken() au lieu d'accéder directement au localStorage
       setToken(response.token);
       setUser(response.user);
+      
       message.success('Connexion réussie');
+      showMessage('Connexion réussie', 'success');
+      
       return response.user;
     } catch (err) {
-      setError(err.response?.data?.message || 'Échec de la connexion');
-      message.error('Échec de la connexion');
-      throw err;
+      console.error('❌ Erreur lors de la connexion:', err);
+      
+      // Gestion d'erreur plus détaillée
+      let errorMessage = 'Échec de la connexion';
+      
+      if (err.response) {
+        // Erreur de réponse du serveur
+        if (err.response.status === 401) {
+          errorMessage = 'Email ou mot de passe incorrect';
+        } else if (err.response.status === 404) {
+          errorMessage = 'Service d\'authentification non disponible. Vérifiez que les mocks sont activés.';
+        } else if (err.response.data?.message) {
+          errorMessage = err.response.data.message;
+        } else {
+          errorMessage = `Erreur serveur: ${err.response.status}`;
+        }
+      } else if (err.request) {
+        // Erreur de réseau
+        errorMessage = 'Impossible de contacter le serveur. Vérifiez votre connexion réseau ou la configuration des mocks.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      message.error(errorMessage);
+      showMessage(errorMessage, 'error');
+      
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -76,16 +116,22 @@ export const AuthProvider = ({ children }) => {
 
   // Fonction de logout
   const logout = () => {
+    console.log('🚪 Déconnexion de l\'utilisateur');
     // Utilisation de removeToken() de manière cohérente
     removeToken();
     setUser(null);
+    setError(null);
     message.success('Déconnexion réussie');
+    showMessage('Déconnexion réussie', 'success');
   };
 
   // Fonction d'enregistrement avec gestion des sous-catégories de staff
   const register = async (userData) => {
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log('📝 Tentative d\'inscription pour:', userData.email);
       
       // Traitement spécial pour le rôle "staff" avec sous-catégories
       let processedData = { ...userData };
@@ -96,12 +142,29 @@ export const AuthProvider = ({ children }) => {
       }
       
       const response = await registerUser(processedData);
+      
+      console.log('✅ Inscription réussie:', response);
+      
       message.success('Inscription réussie. Veuillez vous connecter.');
+      showMessage('Inscription réussie. Veuillez vous connecter.', 'success');
+      
       return response;
     } catch (err) {
-      setError(err.response?.data?.message || 'Échec de l\'inscription');
-      message.error('Échec de l\'inscription');
-      throw err;
+      console.error('❌ Erreur lors de l\'inscription:', err);
+      
+      let errorMessage = 'Échec de l\'inscription';
+      
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      message.error(errorMessage);
+      showMessage(errorMessage, 'error');
+      
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }

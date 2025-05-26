@@ -25,9 +25,9 @@ import { useColorMode } from '../../context/ThemeContext';
 
 // ===== FONCTIONS DE VALIDATION CRITIQUES =====
 
-const validateDimensions = (width, height, minSize = 5) => {
-  const safeWidth = Math.max(Number(width) || minSize, minSize);
-  const safeHeight = Math.max(Number(height) || minSize, minSize);
+const validateDimensions = (width, height, minSize = 5, maxSize = 2000) => {
+  const safeWidth = Math.max(Math.min(Number(width) || minSize, maxSize), minSize);
+  const safeHeight = Math.max(Math.min(Number(height) || minSize, maxSize), minSize);
   return { width: safeWidth, height: safeHeight };
 };
 
@@ -58,7 +58,11 @@ const Canvas = ({
   selectedItem,
   onObstacleDragEnd: propOnObstacleDragEnd,
   obstaclesDraggable = false,
-  debug = false
+  debug = false,
+  // NOUVELLES PROPS POUR CORRIGER LE PROBLÈME
+  fixedSize = false, // Si true, désactive le redimensionnement automatique
+  maxWidth = 1000,   // Largeur maximale pour éviter l'étirement infini
+  maxHeight = 600    // Hauteur maximale pour éviter l'étirement infini
 }) => {
   const theme = useTheme();
   const { mode } = useColorMode();
@@ -71,9 +75,9 @@ const Canvas = ({
   const [selectedId, setSelectedId] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
   
-  // États pour les dimensions du canvas - SÉCURISÉS
+  // États pour les dimensions du canvas - SÉCURISÉS avec limites maximales
   const [canvasSize, setCanvasSize] = useState(() => {
-    const validatedSize = validateDimensions(propWidth, height, 400);
+    const validatedSize = validateDimensions(propWidth, height, 400, Math.min(maxWidth, 1200));
     return {
       width: Math.max(validatedSize.width, 400),
       height: Math.max(validatedSize.height, 300)
@@ -92,54 +96,90 @@ const Canvas = ({
     setSnackbar(prev => ({ ...prev, open: false }));
   }, []);
 
-  // Mise à jour sécurisée de la taille du canvas
+  // Mise à jour sécurisée de la taille du canvas avec limites strictes
   const updateCanvasSize = useCallback(() => {
+    // Si fixedSize est true, ne pas redimensionner automatiquement
+    if (fixedSize) return;
+    
     if (!containerRef.current) return;
     
     try {
       const containerWidth = containerRef.current.offsetWidth;
       const containerHeight = containerRef.current.offsetHeight;
       
+      // Éviter les valeurs nulles ou trop petites qui causent des problèmes
+      if (containerWidth < 100 || containerHeight < 100) {
+        return;
+      }
+      
+      // Appliquer les limites maximales strictement
+      const constrainedWidth = Math.min(containerWidth || propWidth, maxWidth);
+      const constrainedHeight = Math.min(containerHeight || height, maxHeight);
+      
       const validatedSize = validateDimensions(
-        containerWidth || propWidth,
-        containerHeight || height,
-        400
+        constrainedWidth,
+        constrainedHeight,
+        400,
+        Math.max(maxWidth, 1200) // Limite absolue
       );
       
       setCanvasSize(prevSize => {
-        if (prevSize.width !== validatedSize.width || prevSize.height !== validatedSize.height) {
-          return {
-            width: Math.max(validatedSize.width, 400),
-            height: Math.max(validatedSize.height, 300)
-          };
+        // Éviter les mises à jour inutiles qui peuvent causer des boucles
+        const newWidth = Math.max(Math.min(validatedSize.width, maxWidth), 400);
+        const newHeight = Math.max(Math.min(validatedSize.height, maxHeight), 300);
+        
+        if (Math.abs(prevSize.width - newWidth) < 10 && Math.abs(prevSize.height - newHeight) < 10) {
+          return prevSize; // Pas de changement significatif
         }
-        return prevSize;
+        
+        return {
+          width: newWidth,
+          height: newHeight
+        };
       });
     } catch (error) {
       console.warn('Erreur lors de la mise à jour des dimensions:', error);
     }
-  }, [propWidth, height]);
+  }, [propWidth, height, fixedSize, maxWidth, maxHeight]);
   
-  // Observer pour les changements de taille - OPTIMISÉ
+  // Observer pour les changements de taille - OPTIMISÉ avec debounce
   useEffect(() => {
-    updateCanvasSize();
+    // Si fixedSize, utiliser les dimensions par défaut sans observer
+    if (fixedSize) {
+      const validatedSize = validateDimensions(propWidth, height, 400, maxWidth);
+      setCanvasSize({
+        width: Math.min(validatedSize.width, maxWidth),
+        height: Math.min(validatedSize.height, maxHeight)
+      });
+      return;
+    }
+    
+    // Debounce pour éviter trop de mises à jour
+    let timeoutId;
+    const debouncedUpdateCanvasSize = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(updateCanvasSize, 100);
+    };
+    
+    debouncedUpdateCanvasSize();
     
     const resizeObserver = new ResizeObserver(() => {
-      updateCanvasSize();
+      debouncedUpdateCanvasSize();
     });
     
     if (containerRef.current) {
       resizeObserver.observe(containerRef.current);
     }
     
-    const handleResize = () => updateCanvasSize();
+    const handleResize = () => debouncedUpdateCanvasSize();
     window.addEventListener('resize', handleResize);
     
     return () => {
+      clearTimeout(timeoutId);
       resizeObserver.disconnect();
       window.removeEventListener('resize', handleResize);
     };
-  }, [updateCanvasSize]);
+  }, [updateCanvasSize, fixedSize, propWidth, height, maxWidth, maxHeight]);
   
   // Synchroniser la sélection avec le parent
   useEffect(() => {
@@ -326,13 +366,14 @@ const Canvas = ({
     
     try {
       const points = safePerimeter.flatMap(point => [point.x, point.y]);
+      const perimeterColor = currentFloorPlan?.perimeterColor || theme.palette.primary.main;
       
       return (
         <Line
           points={points}
           closed={true}
-          stroke={theme.palette.primary.main}
-          fill="rgba(76, 56, 136, 0.1)"
+          stroke={perimeterColor}
+          fill={`${perimeterColor}15`} // 15 pour une transparence légère
           strokeWidth={2}
           listening={false}
         />
@@ -341,7 +382,7 @@ const Canvas = ({
       console.warn('Erreur lors du rendu du périmètre:', error);
       return null;
     }
-  }, [safePerimeter, theme]);
+  }, [safePerimeter, theme, currentFloorPlan?.perimeterColor]);
   
   // Obstacles rendus de manière sécurisée
   const renderObstacles = useMemo(() => {
@@ -449,7 +490,9 @@ const Canvas = ({
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          height: `${height}px`,
+          height: `${Math.min(height, maxHeight)}px`,
+          width: fixedSize ? `${Math.min(propWidth, maxWidth)}px` : '100%',
+          maxWidth: `${maxWidth}px`,
           borderRadius: 2,
           border: `1px dashed ${theme.palette.divider}`,
           backgroundColor: theme.palette.background.paper,
@@ -476,12 +519,17 @@ const Canvas = ({
     );
   }
   
-  // Couleurs d'arrière-plan du canvas selon le thème
-  const bgColor = isDark ? '#1E1E1E' : '#f9f9f9';
+  // Couleurs d'arrière-plan du canvas selon le thème et la configuration du plan
+  const bgColor = currentFloorPlan?.backgroundColor || (isDark ? '#1E1E1E' : '#f9f9f9');
   const strokeColor = isDark ? '#333333' : '#dddddd';
+  const gridEnabled = currentFloorPlan?.gridEnabled !== false; // Par défaut activé
+  const gridSize = currentFloorPlan?.gridSize || 20;
   
-  // Vérification finale des dimensions avant rendu
-  if (canvasSize.width <= 0 || canvasSize.height <= 0) {
+  // Vérification finale des dimensions avant rendu avec limites strictes
+  const finalCanvasWidth = Math.min(Math.max(canvasSize.width, 400), maxWidth);
+  const finalCanvasHeight = Math.min(Math.max(canvasSize.height, 300), maxHeight);
+  
+  if (finalCanvasWidth <= 0 || finalCanvasHeight <= 0) {
     return (
       <Paper
         elevation={0}
@@ -490,7 +538,9 @@ const Canvas = ({
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          height: `${height}px`,
+          height: `${Math.min(height, maxHeight)}px`,
+          width: fixedSize ? `${Math.min(propWidth, maxWidth)}px` : '100%',
+          maxWidth: `${maxWidth}px`,
           borderRadius: 2,
           border: `1px solid ${theme.palette.divider}`,
           backgroundColor: theme.palette.background.paper,
@@ -509,7 +559,10 @@ const Canvas = ({
         elevation={0}
         ref={containerRef}
         sx={{
-          height: `${height}px`,
+          height: `${finalCanvasHeight}px`,
+          width: fixedSize ? `${finalCanvasWidth}px` : '100%',
+          maxWidth: `${maxWidth}px`,
+          maxHeight: `${maxHeight}px`,
           borderRadius: 2,
           border: `1px solid ${theme.palette.divider}`,
           backgroundColor: theme.palette.background.paper,
@@ -519,8 +572,8 @@ const Canvas = ({
       >
         <Stage
           ref={stageRef}
-          width={canvasSize.width}
-          height={canvasSize.height}
+          width={finalCanvasWidth}
+          height={finalCanvasHeight}
           onMouseDown={checkDeselect}
           onTouchStart={checkDeselect}
         >
@@ -529,21 +582,21 @@ const Canvas = ({
             <Rect
               x={0}
               y={0}
-              width={Math.max(canvasSize.width, 1)}
-              height={Math.max(canvasSize.height, 1)}
+              width={finalCanvasWidth}
+              height={finalCanvasHeight}
               fill={bgColor}
               stroke={strokeColor}
               strokeWidth={1}
               listening={false}
             />
             
-            {/* Grille en mode édition/déplacement */}
-            {dragMode && editable && debug && Array.from({ length: Math.ceil(canvasSize.height / 20) }).map((_, index) => (
+            {/* Grille configurable */}
+            {gridEnabled && (dragMode || debug) && Array.from({ length: Math.ceil(finalCanvasHeight / gridSize) }).map((_, index) => (
               <Rect
                 key={`grid-h-${index}`}
                 x={0}
-                y={index * 20}
-                width={Math.max(canvasSize.width, 1)}
+                y={index * gridSize}
+                width={finalCanvasWidth}
                 height={1}
                 fill="transparent"
                 stroke={theme.palette.divider}
@@ -554,13 +607,13 @@ const Canvas = ({
               />
             ))}
             
-            {dragMode && editable && debug && Array.from({ length: Math.ceil(canvasSize.width / 20) }).map((_, index) => (
+            {gridEnabled && (dragMode || debug) && Array.from({ length: Math.ceil(finalCanvasWidth / gridSize) }).map((_, index) => (
               <Rect
                 key={`grid-v-${index}`}
-                x={index * 20}
+                x={index * gridSize}
                 y={0}
                 width={1}
-                height={Math.max(canvasSize.height, 1)}
+                height={finalCanvasHeight}
                 fill="transparent"
                 stroke={theme.palette.divider}
                 strokeWidth={1}
