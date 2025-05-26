@@ -1,275 +1,382 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import {
-  Box,
-  TextField,
-  Button,
-  Typography,
-  Paper,
-  Alert,
-  InputAdornment,
+import { 
+  Box, 
+  TextField, 
+  Button, 
+  Typography, 
   IconButton,
+  InputAdornment,
+  FormControlLabel,
+  Checkbox,
+  Link,
+  Alert,
+  CircularProgress,
   Divider,
-  CircularProgress
+  Paper
 } from '@mui/material';
-import {
-  Visibility,
-  VisibilityOff,
-  Email,
-  Lock,
-  Login as LoginIcon
+import { 
+  Visibility, 
+  VisibilityOff, 
+  Email as EmailIcon,
+  Lock as LockIcon,
+  Login as LoginIcon,
+  PersonAdd as PersonAddIcon
 } from '@mui/icons-material';
-import { useAuth } from '../../hooks/useAuth';
-import { useTheme, alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import { useColorMode } from '../../context/ThemeContext';
+import { useAuth } from '../../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 const LoginForm = () => {
   const theme = useTheme();
   const { mode } = useColorMode();
   const isDark = mode === 'dark';
+  const { login, loading } = useAuth();
   const navigate = useNavigate();
-  const { login } = useAuth();
 
-  // ✅ États locaux définis
+  // États du formulaire
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
-  const [loading, setLoading] = useState(false); // ✅ setLoading défini
-  const [error, setError] = useState(''); // ✅ setError défini
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState('');
 
-  // Gestion des changements dans les inputs
+  // Gestionnaire de changement des champs
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
-    
     // Effacer l'erreur quand l'utilisateur tape
-    if (error) {
-      setError('');
-    }
+    if (error) setError('');
   };
 
-  // Basculer la visibilité du mot de passe
-  const handleTogglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
-
-  // ✅ Gestionnaire de soumission corrigé avec toutes les variables définies
+  // Gestionnaire de soumission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validation basique
+    setError('');
+
+    // Validation côté client
     if (!formData.email || !formData.password) {
       setError('Veuillez remplir tous les champs');
       return;
     }
 
-    try {
-      setLoading(true); // ✅ setLoading disponible
-      setError(''); // ✅ setError disponible
-      
-      await login(formData);
-      
-      // Navigation après connexion réussie
-      navigate('/dashboard'); // ✅ navigate disponible
-      
-    } catch (err) { // ✅ CORRECTION: Utiliser 'err' et non 'error'
-      console.error('Erreur de connexion:', err); // ✅ CORRECTION: Utiliser 'err'
-      setError(err.message || 'Erreur de connexion'); // ✅ setError disponible
-    } finally {
-      setLoading(false); // ✅ setLoading disponible
+    if (!formData.email.includes('@')) {
+      setError('Veuillez entrer une adresse email valide');
+      return;
     }
+
+    try {
+      await login(formData);
+      // La redirection sera gérée par le contexte d'authentification
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message || 'Échec de la connexion');
+    }
+  };
+
+  // Toggle du mot de passe
+  const handleTogglePassword = () => {
+    setShowPassword(!showPassword);
   };
 
   return (
     <Box
       sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: isDark
-          ? `linear-gradient(135deg, ${theme.palette.background.default} 0%, ${alpha(theme.palette.primary.dark, 0.1)} 100%)`
-          : `linear-gradient(135deg, ${alpha(theme.palette.primary.light, 0.1)} 0%, ${theme.palette.background.default} 100%)`,
-        padding: 2
+        width: '100%',
+        maxWidth: '480px', // ✅ Largeur augmentée
+        mx: 'auto',
+        p: 0,
       }}
     >
+      {/* Header du formulaire */}
+      <Box sx={{ textAlign: 'center', mb: 4 }}>
+        <Typography 
+          variant="h4" 
+          component="h1" 
+          sx={{
+            fontWeight: 700,
+            mb: 1,
+            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
+          Connexion
+        </Typography>
+        <Typography 
+          variant="body1" 
+          color="text.secondary"
+          sx={{ fontSize: '1.1rem' }}
+        >
+          Accédez à votre espace ZENGEST
+        </Typography>
+      </Box>
+
+      {/* Suggestions de comptes de test */}
       <Paper
-        elevation={isDark ? 8 : 4}
+        elevation={0}
         sx={{
-          p: 4,
-          width: '100%',
-          maxWidth: 400,
-          backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.9 : 0.95),
-          backdropFilter: 'blur(10px)',
-          borderRadius: 3,
-          border: `1px solid ${alpha(theme.palette.divider, 0.2)}`
+          p: 2,
+          mb: 3,
+          backgroundColor: alpha(theme.palette.info.main, 0.1),
+          border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
+          borderRadius: 2,
         }}
       >
-        {/* En-tête */}
-        <Box sx={{ textAlign: 'center', mb: 3 }}>
-          <Typography
-            variant="h4"
-            component="h1"
-            sx={{
-              fontWeight: 700,
-              color: theme.palette.primary.main,
-              mb: 1
+        <Typography variant="subtitle2" color="info.main" gutterBottom>
+          💡 Comptes de test disponibles :
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+          <strong>Admin :</strong> admin@restaurant.com<br />
+          <strong>Manager :</strong> marie@restaurant.com<br />
+          <strong>Staff :</strong> jean@restaurant.com<br />
+          <em>Mot de passe : password123</em>
+        </Typography>
+      </Paper>
+
+      {/* Formulaire */}
+      <Box component="form" onSubmit={handleSubmit} noValidate>
+        {/* Champ Email */}
+        <TextField
+          fullWidth
+          id="email"
+          name="email"
+          label="Adresse email"
+          type="email"
+          value={formData.email}
+          onChange={handleChange}
+          disabled={loading}
+          autoComplete="email"
+          autoFocus
+          variant="outlined"
+          size="large" // ✅ Taille plus grande
+          sx={{ 
+            mb: 3, // ✅ Plus d'espacement
+            '& .MuiOutlinedInput-root': {
+              height: '56px', // ✅ Hauteur augmentée
+              backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.6 : 0.8),
+              backdropFilter: 'blur(4px)',
+              '& fieldset': {
+                borderColor: alpha(theme.palette.primary.main, 0.3),
+              },
+              '&:hover fieldset': {
+                borderColor: alpha(theme.palette.primary.main, 0.5),
+              },
+              '&.Mui-focused fieldset': {
+                borderColor: theme.palette.primary.main,
+                borderWidth: '2px',
+              },
+            },
+            '& .MuiInputLabel-root': {
+              fontSize: '1rem', // ✅ Label plus grand
+            }
+          }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <EmailIcon color="primary" />
+              </InputAdornment>
+            ),
+          }}
+          placeholder="exemple@restaurant.com"
+        />
+
+        {/* Champ Mot de passe */}
+        <TextField
+          fullWidth
+          id="password"
+          name="password"
+          label="Mot de passe"
+          type={showPassword ? 'text' : 'password'}
+          value={formData.password}
+          onChange={handleChange}
+          disabled={loading}
+          autoComplete="current-password"
+          variant="outlined"
+          size="large" // ✅ Taille plus grande
+          sx={{ 
+            mb: 3, // ✅ Plus d'espacement
+            '& .MuiOutlinedInput-root': {
+              height: '56px', // ✅ Hauteur augmentée
+              backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.6 : 0.8),
+              backdropFilter: 'blur(4px)',
+              '& fieldset': {
+                borderColor: alpha(theme.palette.primary.main, 0.3),
+              },
+              '&:hover fieldset': {
+                borderColor: alpha(theme.palette.primary.main, 0.5),
+              },
+              '&.Mui-focused fieldset': {
+                borderColor: theme.palette.primary.main,
+                borderWidth: '2px',
+              },
+            },
+            '& .MuiInputLabel-root': {
+              fontSize: '1rem', // ✅ Label plus grand
+            }
+          }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <LockIcon color="primary" />
+              </InputAdornment>
+            ),
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  aria-label="toggle password visibility"
+                  onClick={handleTogglePassword}
+                  edge="end"
+                  disabled={loading}
+                  sx={{
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.action.hover, 0.1),
+                    }
+                  }}
+                >
+                  {showPassword ? <VisibilityOff /> : <Visibility />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+          placeholder="Votre mot de passe"
+        />
+
+        {/* Options */}
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          mb: 3 
+        }}>
+          <FormControlLabel
+            control={
+              <Checkbox 
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                disabled={loading}
+                color="primary"
+                size="medium" // ✅ Checkbox plus grande
+              />
+            }
+            label={
+              <Typography variant="body2" sx={{ fontSize: '0.95rem' }}>
+                Se souvenir de moi
+              </Typography>
+            }
+          />
+          <Link 
+            href="#" 
+            variant="body2" 
+            color="primary"
+            sx={{ 
+              textDecoration: 'none',
+              fontSize: '0.95rem',
+              '&:hover': {
+                textDecoration: 'underline',
+              }
             }}
           >
-            Connexion
-          </Typography>
-          <Typography
-            variant="body2"
-            color="text.secondary"
-          >
-            Connectez-vous à votre compte
-          </Typography>
+            Mot de passe oublié ?
+          </Link>
         </Box>
 
-        {/* Affichage de l'erreur */}
+        {/* Message d'erreur */}
         {error && (
-          <Alert
-            severity="error"
-            sx={{ mb: 2 }}
-            onClose={() => setError('')}
+          <Alert 
+            severity="error" 
+            sx={{ 
+              mb: 3,
+              borderRadius: 2,
+              '& .MuiAlert-message': {
+                fontSize: '0.95rem', // ✅ Texte plus grand
+              }
+            }}
           >
             {error}
           </Alert>
         )}
 
-        {/* Formulaire */}
-        <Box component="form" onSubmit={handleSubmit} noValidate>
-          {/* Champ email */}
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            id="email"
-            label="Adresse email"
-            name="email"
-            autoComplete="email"
-            autoFocus
-            value={formData.email}
-            onChange={handleChange}
-            disabled={loading}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Email color="action" />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ mb: 2 }}
-          />
+        {/* Bouton de connexion */}
+        <Button
+          type="submit"
+          fullWidth
+          variant="contained"
+          disabled={loading}
+          size="large" // ✅ Bouton plus grand
+          sx={{
+            height: '56px', // ✅ Hauteur augmentée
+            fontSize: '1.1rem', // ✅ Texte plus grand
+            fontWeight: 600,
+            borderRadius: 2,
+            textTransform: 'none',
+            mb: 3,
+            background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.light})`,
+            boxShadow: isDark 
+              ? `0 4px 20px ${alpha(theme.palette.primary.main, 0.4)}`
+              : `0 4px 20px ${alpha(theme.palette.primary.main, 0.3)}`,
+            '&:hover': {
+              background: `linear-gradient(45deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
+              transform: 'translateY(-2px)',
+              boxShadow: isDark 
+                ? `0 6px 24px ${alpha(theme.palette.primary.main, 0.5)}`
+                : `0 6px 24px ${alpha(theme.palette.primary.main, 0.4)}`,
+            },
+            '&:disabled': {
+              background: theme.palette.action.disabledBackground,
+              transform: 'none',
+            },
+            transition: 'all 0.3s ease-in-out',
+          }}
+          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <LoginIcon />}
+        >
+          {loading ? 'Connexion en cours...' : 'Se connecter'}
+        </Button>
 
-          {/* Champ mot de passe */}
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            name="password"
-            label="Mot de passe"
-            type={showPassword ? 'text' : 'password'}
-            id="password"
-            autoComplete="current-password"
-            value={formData.password}
-            onChange={handleChange}
-            disabled={loading}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Lock color="action" />
-                </InputAdornment>
-              ),
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label="toggle password visibility"
-                    onClick={handleTogglePasswordVisibility}
-                    edge="end"
-                    disabled={loading}
-                  >
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-            sx={{ mb: 3 }}
-          />
+        {/* Divider */}
+        <Divider sx={{ my: 3 }}>
+          <Typography variant="body2" color="text.secondary">
+            ou
+          </Typography>
+        </Divider>
 
-          {/* Bouton de connexion */}
+        {/* Lien vers l'inscription */}
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: '0.95rem' }}>
+            Vous n'avez pas encore de compte ?
+          </Typography>
           <Button
-            type="submit"
+            variant="outlined"
             fullWidth
-            variant="contained"
-            disabled={loading}
+            size="large" // ✅ Bouton plus grand
+            startIcon={<PersonAddIcon />}
+            onClick={() => navigate('/register')}
             sx={{
-              py: 1.5,
-              mb: 2,
-              fontSize: '1rem',
-              fontWeight: 600,
+              height: '48px', // ✅ Hauteur augmentée
+              fontSize: '1rem', // ✅ Texte plus grand
+              fontWeight: 500,
               borderRadius: 2,
-              position: 'relative'
+              textTransform: 'none',
+              borderColor: alpha(theme.palette.primary.main, 0.5),
+              color: theme.palette.primary.main,
+              '&:hover': {
+                borderColor: theme.palette.primary.main,
+                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                transform: 'translateY(-1px)',
+              },
+              transition: 'all 0.2s ease-in-out',
             }}
           >
-            {loading ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CircularProgress size={20} color="inherit" />
-                <span>Connexion...</span>
-              </Box>
-            ) : (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <LoginIcon />
-                <span>Se connecter</span>
-              </Box>
-            )}
+            Créer un compte
           </Button>
-
-          <Divider sx={{ my: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              ou
-            </Typography>
-          </Divider>
-
-          {/* Lien vers l'inscription */}
-          <Box sx={{ textAlign: 'center' }}>
-            <Typography variant="body2" color="text.secondary">
-              Pas encore de compte ?{' '}
-              <Link
-                to="/register"
-                style={{
-                  color: theme.palette.primary.main,
-                  textDecoration: 'none',
-                  fontWeight: 500
-                }}
-              >
-                S'inscrire
-              </Link>
-            </Typography>
-          </Box>
         </Box>
-
-        {/* Comptes de test */}
-        <Box sx={{ mt: 3, p: 2, backgroundColor: alpha(theme.palette.info.main, 0.1), borderRadius: 2 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-            Comptes de test :
-          </Typography>
-          <Typography variant="caption" sx={{ display: 'block' }}>
-            • Admin: admin@restaurant.com / password123
-          </Typography>
-          <Typography variant="caption" sx={{ display: 'block' }}>
-            • Manager: marie@restaurant.com / password123
-          </Typography>
-          <Typography variant="caption" sx={{ display: 'block' }}>
-            • Staff: jean@restaurant.com / password123
-          </Typography>
-        </Box>
-      </Paper>
+      </Box>
     </Box>
   );
 };

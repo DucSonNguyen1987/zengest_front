@@ -53,7 +53,7 @@ const setupMock = (axiosInstance) => {
     // ========== AUTHENTIFICATION ==========
     
     // Login
-    mock.onPost('/auth/login').reply((_config) => {
+    mock.onPost('/auth/login').reply((config) => {
       console.log('🔐 Mock: Tentative de connexion');
       
       try {
@@ -81,14 +81,14 @@ const setupMock = (axiosInstance) => {
           user: userWithoutPassword,
           token: validToken
         }];
-      } catch (_error) {
+      } catch (error) {
         console.error('❌ Mock: Erreur lors du parsing des données de login:', error);
         return [400, { message: 'Données invalides' }];
       }
     });
     
     // Register
-    mock.onPost('/auth/register').reply((_config) => {
+    mock.onPost('/auth/register').reply((config) => {
       console.log('📝 Mock: Tentative d\'inscription');
       
       try {
@@ -112,14 +112,14 @@ const setupMock = (axiosInstance) => {
         
         console.log(`✅ Mock: Inscription réussie pour ${newUser.email}`);
         return [201, { message: 'Inscription réussie' }];
-      } catch (_error) {
+      } catch (error) {
         console.error('❌ Mock: Erreur lors de l\'inscription:', error);
         return [400, { message: 'Données invalides' }];
       }
     });
     
     // Récupération des données utilisateur
-    mock.onGet('/auth/me').reply((_config) => {
+    mock.onGet('/auth/me').reply((config) => {
       console.log('👤 Mock: Récupération des données utilisateur');
       
       // Extraire le token de l'en-tête Authorization
@@ -160,7 +160,7 @@ const setupMock = (axiosInstance) => {
         console.log(`✅ Mock: Données utilisateur récupérées pour ${userWithoutPassword.firstName}`);
         return [200, userWithoutPassword];
         
-      } catch (_error) {
+      } catch (error) {
         console.error('❌ Mock: Erreur lors du décodage du token:', error);
         return [401, { message: 'Token invalide' }];
       }
@@ -180,7 +180,7 @@ const setupMock = (axiosInstance) => {
     });
     
     // Récupération d'un rôle spécifique
-    mock.onGet(/\/user-roles\/\w+/).reply((_config) => {
+    mock.onGet(/\/user-roles\/\w+/).reply((config) => {
       const roleId = config.url.split('/').pop();
       console.log(`🏷️ Mock: Récupération du rôle ${roleId}`);
       
@@ -287,7 +287,7 @@ const setupMock = (axiosInstance) => {
     });
 
     // GET /floor-plans/:id - Récupération d'un plan spécifique
-    mock.onGet(/\/floor-plans\/\w+/).reply((_config) => {
+    mock.onGet(/\/floor-plans\/\w+/).reply((config) => {
       const id = config.url.split('/').pop();
       console.log(`🏗️ Mock: Récupération du plan ${id}`);
       
@@ -302,7 +302,7 @@ const setupMock = (axiosInstance) => {
     });
 
     // POST /floor-plans - Création d'un nouveau plan
-    mock.onPost('/floor-plans').reply((_config) => {
+    mock.onPost('/floor-plans').reply((config) => {
       console.log('🏗️ Mock: Création d\'un nouveau plan');
       
       try {
@@ -319,14 +319,14 @@ const setupMock = (axiosInstance) => {
         
         console.log(`✅ Mock: Plan créé avec l'ID ${newFloorPlan.id}`);
         return [201, newFloorPlan];
-      } catch (_error) {
+      } catch (error) {
         console.error('❌ Mock: Erreur lors de la création du plan:', error);
         return [400, { message: 'Données invalides' }];
       }
     });
 
     // PUT /floor-plans/:id - Mise à jour d'un plan
-    mock.onPut(/\/floor-plans\/\w+/).reply((_config) => {
+    mock.onPut(/\/floor-plans\/\w+/).reply((config) => {
       const id = config.url.split('/').pop();
       console.log(`🏗️ Mock: Mise à jour du plan ${id}`);
       
@@ -348,14 +348,14 @@ const setupMock = (axiosInstance) => {
         
         console.log(`✅ Mock: Plan ${id} mis à jour`);
         return [200, updatedFloorPlan];
-      } catch (_error) {
+      } catch (error) {
         console.error('❌ Mock: Erreur lors de la mise à jour:', error);
         return [400, { message: 'Données invalides' }];
       }
     });
 
     // DELETE /floor-plans/:id - Suppression d'un plan
-    mock.onDelete(/\/floor-plans\/\w+/).reply((_config) => {
+    mock.onDelete(/\/floor-plans\/\w+/).reply((config) => {
       const id = config.url.split('/').pop();
       console.log(`🏗️ Mock: Suppression du plan ${id}`);
       
@@ -379,7 +379,7 @@ const setupMock = (axiosInstance) => {
     });
     
     // Réservations
-    mock.onGet('/reservations').reply((_config) => {
+    mock.onGet('/reservations').reply((config) => {
       console.log('📅 Mock: Récupération des réservations');
       console.log('📋 Paramètres de la requête:', config.params);
       
@@ -415,7 +415,7 @@ const setupMock = (axiosInstance) => {
     });
 
     // Gestion des routes non mockées
-    mock.onAny().reply((_config) => {
+    mock.onAny().reply((config) => {
       console.warn(`⚠️ Mock: Route non trouvée: ${config.method?.toUpperCase()} ${config.url}`);
       return [404, { message: `Route non trouvée: ${config.method?.toUpperCase()} ${config.url}` }];
     });
@@ -436,7 +436,7 @@ const setupMock = (axiosInstance) => {
     console.log('  - GET  /orders');
     console.log('  - GET  /menu-items');
 
-  } catch (_error) {
+  } catch (error) {
     console.error('❌ Erreur lors de la configuration du MockAdapter:', error);
     throw error;
   }
