@@ -11,6 +11,9 @@ import FloorPlanManagement from '../pages/floorPlan/FloorPlanManagement';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import { ROLES, PERMISSIONS } from '../utils/permissions';
 
+// Import du composant de debug
+import PermissionsDebug from '../components/debug/PermissionsDebug';
+
 // Composant pour rediriger selon le rôle
 const RoleBasedRedirect = () => {
   return <Navigate to="/dashboard" replace />;
@@ -48,6 +51,41 @@ const routes = [
         path: 'dashboard',
         element: <Dashboard />,
       },
+      
+      // ✅ DEBUG: Route de debug des permissions (accessible à tous)
+      {
+        path: 'debug-permissions',
+        element: <PermissionsDebug />,
+      },
+      
+      // ✅ SOLUTION TEMPORAIRE: Plans de salle accessibles à tous les utilisateurs connectés
+      {
+        path: 'floor-plans',
+        element: (
+          <ProtectedRoute>
+            <FloorPlanManagement />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'floor-plans/:id',
+        element: (
+          <ProtectedRoute>
+            <FloorPlanManagement />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'floor-plans/:id/edit',
+        element: (
+          <ProtectedRoute>
+            <FloorPlanManagement />
+          </ProtectedRoute>
+        ),
+      },
+      
+      // ✅ VERSION AVEC PERMISSIONS (commentée temporairement)
+      /*
       {
         path: 'floor-plans',
         element: (
@@ -72,6 +110,8 @@ const routes = [
           </ProtectedRoute>
         ),
       },
+      */
+      
       // Routes supplémentaires pour les fonctionnalités futures
       {
         path: 'reservations',

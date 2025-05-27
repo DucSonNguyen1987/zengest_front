@@ -1,23 +1,38 @@
-import React, { createContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getCurrentUser, loginUser, registerUser } from '../api/auth';
 import { getToken, isTokenValid, removeToken, setToken, clearAuth } from '../utils/token';
-import { ROLES } from '../utils/permissions';
-import { Alert, Snackbar } from '@mui/material';
 
 export const AuthContext = createContext();
 
-// ✅ VARIABLES GLOBALES SIMPLIFIÉES
+// ✅ OPTIMISATION: Variables globales pour éviter les re-initialisations
 let isInitialized = false;
+let initPromise = null;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-
-  // ✅ INITIALISATION ULTRA-SIMPLIFIÉE - UNE SEULE FOIS
+  
+  // ✅ OPTIMISATION: Ref pour éviter les callbacks sur les états volatils
+  const userRef = useRef(user);
+  const loadingRef = useRef(loading);
+  
   useEffect(() => {
-    if (isInitialized) return;
+    userRef.current = user;
+    loadingRef.current = loading;
+  }, [user, loading]);
+
+  // ✅ OPTIMISATION: Initialisation une seule fois avec promesse cachée
+  useEffect(() => {
+    if (isInitialized && initPromise) {
+      initPromise.then(() => setLoading(false));
+      return;
+    }
+    
+    if (isInitialized) {
+      setLoading(false);
+      return;
+    }
     
     const initAuth = async () => {
       try {
@@ -47,12 +62,14 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    initAuth();
-  }, []); // ✅ AUCUNE DÉPENDANCE - UNE SEULE EXÉCUTION
+    initPromise = initAuth();
+  }, []); // ✅ Aucune dépendance
 
-  // ✅ CALLBACKS ULTRA-SIMPLES
+  // ✅ OPTIMISATION: Callbacks ultra-stables avec useRef
   const login = useCallback(async (credentials) => {
     setLoading(true);
+    setError(null);
+    
     try {
       const response = await loginUser(credentials);
       setToken(response.token);
@@ -65,16 +82,18 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // ✅ Aucune dépendance
 
   const logout = useCallback(() => {
     clearAuth();
     setUser(null);
     setError(null);
-  }, []);
+  }, []); // ✅ Aucune dépendance
 
   const register = useCallback(async (userData) => {
     setLoading(true);
+    setError(null);
+    
     try {
       const response = await registerUser(userData);
       return response;
@@ -85,9 +104,9 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // ✅ Aucune dépendance
 
-  // ✅ CONTEXT VALUE ULTRA-STABLE
+  // ✅ OPTIMISATION: Context value ultra-stable
   const contextValue = useMemo(() => ({
     user,
     loading,
@@ -101,15 +120,6 @@ export const AuthProvider = ({ children }) => {
   return (
     <AuthContext.Provider value={contextValue}>
       {children}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-      >
-        <Alert severity={snackbar.severity}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </AuthContext.Provider>
   );
 };

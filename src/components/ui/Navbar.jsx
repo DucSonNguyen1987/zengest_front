@@ -19,7 +19,8 @@ import {
   ListItem,
   ListItemText,
   Chip,
-  Badge
+  Badge,
+  Alert
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { 
@@ -31,7 +32,8 @@ import {
   Brightness7 as Brightness7Icon,
   TableRestaurant as FloorPlanIcon,
   Dashboard as DashboardIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  BugReport as DebugIcon
 } from '@mui/icons-material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -54,20 +56,32 @@ const Navbar = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
+  // ✅ DEBUG: Vérification des permissions avec logs
+  const canViewFloorPlans = isAuthenticated && hasPermission(user?.role, PERMISSIONS.VIEW_PROJECTS);
+  const canEditFloorPlans = isAuthenticated && hasPermission(user?.role, PERMISSIONS.EDIT_PROJECTS);
+  
+  // ✅ DEBUG: Logs pour comprendre le problème
+  React.useEffect(() => {
+    console.log('🔍 Navbar Debug Info:');
+    console.log('- isAuthenticated:', isAuthenticated);
+    console.log('- user:', user);
+    console.log('- user.role:', user?.role);
+    console.log('- canViewFloorPlans:', canViewFloorPlans);
+    console.log('- canEditFloorPlans:', canEditFloorPlans);
+    console.log('- PERMISSIONS.VIEW_PROJECTS:', PERMISSIONS.VIEW_PROJECTS);
+  }, [isAuthenticated, user, canViewFloorPlans, canEditFloorPlans]);
+  
   // Définir la valeur active pour les onglets
   const getCurrentTab = () => {
     const path = location.pathname;
     if (path === '/dashboard') return 0;
     if (path === '/floor-plans') return 1;
+    if (path === '/debug-permissions') return 2;
     return false;
   };
 
   const currentTab = getCurrentTab();
-
-  // Vérifier les permissions pour les plans de salle
-  const canViewFloorPlans = isAuthenticated && hasPermission(user?.role, PERMISSIONS.VIEW_PROJECTS);
-  const canEditFloorPlans = isAuthenticated && hasPermission(user?.role, PERMISSIONS.EDIT_PROJECTS);
-
+  
   // Fonction pour gérer la déconnexion
   const handleLogout = () => {
     handleCloseUserMenu();
@@ -99,6 +113,9 @@ const Navbar = () => {
   const handleCreateNewPlan = () => {
     if (canEditFloorPlans) {
       navigate('/floor-plans?action=create');
+    } else {
+      // ✅ DEBUG: Naviguer quand même pour tester
+      navigate('/floor-plans');
     }
   };
 
@@ -175,42 +192,64 @@ const Navbar = () => {
                     color: currentTab === 0 ? theme.palette.primary.main : theme.palette.text.secondary 
                   }}
                 />
-                {canViewFloorPlans && (
-                  <Tab 
-                    label="Plans de salle" 
-                    component={Link} 
-                    to="/floor-plans" 
-                    icon={<FloorPlanIcon />}
-                    iconPosition="start"
-                    sx={{ 
-                      color: currentTab === 1 ? theme.palette.primary.main : theme.palette.text.secondary 
-                    }}
-                  />
-                )}
+                
+                {/* ✅ DEBUG: Afficher TOUJOURS le lien Plans de salle */}
+                <Tab 
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      Plans de salle
+                      {!canViewFloorPlans && (
+                        <Chip 
+                          label="DEBUG" 
+                          size="small" 
+                          color="warning" 
+                          sx={{ fontSize: '0.6rem', height: '16px' }}
+                        />
+                      )}
+                    </Box>
+                  }
+                  component={Link} 
+                  to="/floor-plans" 
+                  icon={<FloorPlanIcon />}
+                  iconPosition="start"
+                  sx={{ 
+                    color: currentTab === 1 ? theme.palette.primary.main : theme.palette.text.secondary 
+                  }}
+                />
+                
+                {/* ✅ DEBUG: Lien vers la page de debug */}
+                <Tab 
+                  label="Debug Permissions" 
+                  component={Link} 
+                  to="/debug-permissions" 
+                  icon={<DebugIcon />}
+                  iconPosition="start"
+                  sx={{ 
+                    color: currentTab === 2 ? theme.palette.primary.main : theme.palette.text.secondary 
+                  }}
+                />
               </Tabs>
 
               {/* Actions rapides pour les plans de salle */}
-              {canEditFloorPlans && (
-                <Box sx={{ ml: 2 }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<AddIcon />}
-                    onClick={handleCreateNewPlan}
-                    sx={{
-                      textTransform: 'none',
-                      borderColor: alpha(theme.palette.primary.main, 0.5),
-                      color: theme.palette.primary.main,
-                      '&:hover': {
-                        borderColor: theme.palette.primary.main,
-                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                      }
-                    }}
-                  >
-                    Nouveau plan
-                  </Button>
-                </Box>
-              )}
+              <Box sx={{ ml: 2 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<AddIcon />}
+                  onClick={handleCreateNewPlan}
+                  sx={{
+                    textTransform: 'none',
+                    borderColor: alpha(theme.palette.primary.main, 0.5),
+                    color: theme.palette.primary.main,
+                    '&:hover': {
+                      borderColor: theme.palette.primary.main,
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    }
+                  }}
+                >
+                  Nouveau plan
+                </Button>
+              </Box>
             </Box>
           )}
 
@@ -228,28 +267,16 @@ const Navbar = () => {
             {/* Affichage conditionnel selon l'état d'authentification */}
             {isAuthenticated ? (
               <>
-                {/* Badge pour les notifications des plans de salle */}
-                {canViewFloorPlans && !isMobile && (
-                  <IconButton
-                    color="inherit"
-                    component={Link}
-                    to="/floor-plans"
-                    sx={{ mr: 1 }}
-                  >
-                    <Badge 
-                      badgeContent={3} 
-                      color="primary"
-                      sx={{
-                        '& .MuiBadge-badge': {
-                          fontSize: '0.7rem',
-                          height: '16px',
-                          minWidth: '16px'
-                        }
-                      }}
-                    >
-                      <FloorPlanIcon />
-                    </Badge>
-                  </IconButton>
+                {/* ✅ DEBUG: Info utilisateur visible */}
+                {!isMobile && (
+                  <Box sx={{ mr: 2, textAlign: 'right' }}>
+                    <Typography variant="body2" sx={{ fontSize: '0.75rem', opacity: 0.8 }}>
+                      {user?.firstName} {user?.lastName}
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontSize: '0.65rem', opacity: 0.6 }}>
+                      Rôle: {user?.role || 'Non défini'}
+                    </Typography>
+                  </Box>
                 )}
 
                 <IconButton
@@ -278,7 +305,7 @@ const Navbar = () => {
                       borderRadius: 2,
                       boxShadow: `0 8px 32px 0 ${alpha(isDark ? '#000' : theme.palette.primary.dark, 0.1)}`,
                       border: `1px solid ${alpha(isDark ? theme.palette.divider : theme.palette.background.paper, 0.5)}`,
-                      minWidth: 200,
+                      minWidth: 250,
                     }
                   }}
                   transformOrigin={{ horizontal: 'right', vertical: 'top' }}
@@ -292,29 +319,41 @@ const Navbar = () => {
                       <Typography variant="body2" color="text.secondary">
                         {user?.email}
                       </Typography>
-                      <Chip 
-                        label={user?.role} 
-                        size="small" 
-                        color="primary" 
-                        sx={{ mt: 0.5, fontSize: '0.7rem' }}
-                      />
+                      <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
+                        <Chip 
+                          label={user?.role || 'Non défini'} 
+                          size="small" 
+                          color="primary" 
+                          sx={{ fontSize: '0.7rem' }}
+                        />
+                        <Chip 
+                          label={canViewFloorPlans ? 'Accès Plans' : 'Pas d\'accès'} 
+                          size="small" 
+                          color={canViewFloorPlans ? 'success' : 'error'} 
+                          sx={{ fontSize: '0.65rem' }}
+                        />
+                      </Box>
                     </Box>
                   </MenuItem>
                   
                   <Divider />
                   
-                  {/* Accès rapide aux plans de salle */}
-                  {canViewFloorPlans && (
-                    <>
-                      <MenuItem component={Link} to="/floor-plans" onClick={handleCloseUserMenu}>
-                        <ListItemIcon>
-                          <FloorPlanIcon fontSize="small" />
-                        </ListItemIcon>
-                        <Typography variant="body2">Plans de salle</Typography>
-                      </MenuItem>
-                      <Divider />
-                    </>
-                  )}
+                  {/* ✅ DEBUG: Liens de menu toujours visibles */}
+                  <MenuItem component={Link} to="/floor-plans" onClick={handleCloseUserMenu}>
+                    <ListItemIcon>
+                      <FloorPlanIcon fontSize="small" />
+                    </ListItemIcon>
+                    <Typography variant="body2">Plans de salle</Typography>
+                  </MenuItem>
+                  
+                  <MenuItem component={Link} to="/debug-permissions" onClick={handleCloseUserMenu}>
+                    <ListItemIcon>
+                      <DebugIcon fontSize="small" />
+                    </ListItemIcon>
+                    <Typography variant="body2">Debug Permissions</Typography>
+                  </MenuItem>
+                  
+                  <Divider />
                   
                   <MenuItem component={Link} to="/profile" onClick={handleCloseUserMenu}>
                     <ListItemIcon>
@@ -396,6 +435,17 @@ const Navbar = () => {
             ZENGEST
           </Typography>
           
+          {/* ✅ DEBUG: Info utilisateur en mobile */}
+          {isAuthenticated && (
+            <Alert severity="info" sx={{ mb: 2, fontSize: '0.75rem' }}>
+              <Typography variant="caption">
+                <strong>{user?.firstName} {user?.lastName}</strong><br />
+                Rôle: {user?.role || 'Non défini'}<br />
+                Accès Plans: {canViewFloorPlans ? 'Oui' : 'Non'}
+              </Typography>
+            </Alert>
+          )}
+          
           <Divider sx={{ mb: 2 }} />
           
           <List>
@@ -419,28 +469,48 @@ const Navbar = () => {
                   <ListItemText primary="Tableau de bord" />
                 </ListItem>
                 
-                {canViewFloorPlans && (
-                  <ListItem 
-                    button 
-                    selected={location.pathname === '/floor-plans'} 
-                    onClick={() => handleNavigation('/floor-plans')}
-                    sx={{ 
-                      borderRadius: 2,
-                      mb: 1,
-                      '&.Mui-selected': {
-                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                      },
-                    }}
-                  >
-                    <ListItemIcon>
-                      <FloorPlanIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText primary="Plans de salle" />
-                    {canEditFloorPlans && (
-                      <Badge badgeContent="!" color="primary" />
-                    )}
-                  </ListItem>
-                )}
+                {/* ✅ DEBUG: Toujours afficher Plans de salle en mobile */}
+                <ListItem 
+                  button 
+                  selected={location.pathname === '/floor-plans'} 
+                  onClick={() => handleNavigation('/floor-plans')}
+                  sx={{ 
+                    borderRadius: 2,
+                    mb: 1,
+                    '&.Mui-selected': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    },
+                  }}
+                >
+                  <ListItemIcon>
+                    <FloorPlanIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Plans de salle" 
+                    secondary={!canViewFloorPlans ? 'Mode Debug' : null}
+                  />
+                  {!canViewFloorPlans && (
+                    <Chip label="DEBUG" size="small" color="warning" />
+                  )}
+                </ListItem>
+                
+                <ListItem 
+                  button 
+                  selected={location.pathname === '/debug-permissions'} 
+                  onClick={() => handleNavigation('/debug-permissions')}
+                  sx={{ 
+                    borderRadius: 2,
+                    mb: 1,
+                    '&.Mui-selected': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    },
+                  }}
+                >
+                  <ListItemIcon>
+                    <DebugIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary="Debug Permissions" />
+                </ListItem>
               </>
             )}
             

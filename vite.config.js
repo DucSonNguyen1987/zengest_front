@@ -1,34 +1,59 @@
-// vite.config.js
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
+// ✅ Configuration Vite simplifiée pour éviter les erreurs
 export default defineConfig({
   plugins: [react()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
+  
+  server: {
+    port: 5173,
+    host: true,
+    open: false,
+    
+    // ✅ HMR simplifié
+    hmr: {
+      overlay: false,
+      port: 5173,
     },
   },
+
+  // ✅ Build simple
+  build: {
+    target: 'es2020',
+    sourcemap: false,
+    
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': ['react', 'react-dom'],
+          'mui': ['@mui/material', '@mui/icons-material'],
+          'redux': ['@reduxjs/toolkit', 'react-redux'],
+        },
+      },
+    },
+  },
+
+  // ✅ Optimisations de base
   optimizeDeps: {
     include: [
       'react',
       'react-dom',
+      'react-router-dom',
       '@mui/material',
-      '@mui/icons-material',
-      '@emotion/react',
-      '@emotion/styled',
+      '@reduxjs/toolkit',
+      'react-redux',
     ],
-    // Vous pouvez retirer l'exclusion de react-dom/client avec React 18
   },
-  build: {
-    sourcemap: true,
-    commonjsOptions: {
-      transformMixedEsModules: true,
-    },
+
+  // ✅ Configuration simple
+  css: {
+    devSourcemap: false,
   },
+
+  esbuild: {
+    target: 'es2020',
+  },
+
+  logLevel: 'info',
+  clearScreen: false,
 });
