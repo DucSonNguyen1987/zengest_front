@@ -22,13 +22,33 @@ import {
   DragIndicator as DragIndicatorIcon
 } from '@mui/icons-material';
 import { useColorMode } from '../../context/ThemeContext';
+import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
+import { logger } from '../../utils/logger';
 
-// ===== FONCTIONS DE VALIDATION CRITIQUES =====
+// ✅ FONCTIONS DE VALIDATION OPTIMISÉES avec cache
+const validationCache = new Map();
+const VALIDATION_CACHE_SIZE = 100;
 
 const validateDimensions = (width, height, minSize = 5, maxSize = 2000) => {
-  const safeWidth = Math.max(Math.min(Number(width) || minSize, maxSize), minSize);
-  const safeHeight = Math.max(Math.min(Number(height) || minSize, maxSize), minSize);
-  return { width: safeWidth, height: safeHeight };
+  const key = `${width}-${height}-${minSize}-${maxSize}`;
+  
+  if (validationCache.has(key)) {
+    return validationCache.get(key);
+  }
+  
+  const result = {
+    width: Math.max(Math.min(Number(width) || minSize, maxSize), minSize),
+    height: Math.max(Math.min(Number(height) || minSize, maxSize), minSize)
+  };
+  
+  // Nettoyer le cache si trop grand
+  if (validationCache.size >= VALIDATION_CACHE_SIZE) {
+    const firstKey = validationCache.keys().next().value;
+    validationCache.delete(firstKey);
+  }
+  
+  validationCache.set(key, result);
+  return result;
 };
 
 const validatePosition = (x, y) => {
@@ -46,6 +66,19 @@ const validateRotation = (rotation) => {
   return isNaN(rot) ? 0 : rot;
 };
 
+// ✅ FONCTION DEBOUNCE OPTIMISÉE
+const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
 const Canvas = ({ 
   editable = true, 
   height = 400, 
@@ -59,11 +92,13 @@ const Canvas = ({
   onObstacleDragEnd: propOnObstacleDragEnd,
   obstaclesDraggable = false,
   debug = false,
-  // NOUVELLES PROPS POUR CORRIGER LE PROBLÈME
-  fixedSize = false, // Si true, désactive le redimensionnement automatique
-  maxWidth = 1000,   // Largeur maximale pour éviter l'étirement infini
-  maxHeight = 600    // Hauteur maximale pour éviter l'étirement infini
+  fixedSize = false,
+  maxWidth = 1000,
+  maxHeight = 600
 }) => {
+  // Monitoring des performances
+  usePerformanceMonitor('Canvas');
+  
   const theme = useTheme();
   const { mode } = useColorMode();
   const isDark = mode === 'dark';
@@ -75,7 +110,7 @@ const Canvas = ({
   const [selectedId, setSelectedId] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
   
-  // États pour les dimensions du canvas - SÉCURISÉS avec limites maximales
+  // ✅ ÉTATS OPTIMISÉS avec lazy initialization
   const [canvasSize, setCanvasSize] = useState(() => {
     const validatedSize = validateDimensions(propWidth, height, 400, Math.min(maxWidth, 1200));
     return {
@@ -84,67 +119,58 @@ const Canvas = ({
     };
   });
   
-  // État pour le message de succès
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
     severity: 'success'
   });
-  
-  // Fermer le snackbar
+
   const handleCloseSnackbar = useCallback(() => {
     setSnackbar(prev => ({ ...prev, open: false }));
   }, []);
 
-  // Mise à jour sécurisée de la taille du canvas avec limites strictes
-  const updateCanvasSize = useCallback(() => {
-    // Si fixedSize est true, ne pas redimensionner automatiquement
-    if (fixedSize) return;
-    
-    if (!containerRef.current) return;
-    
-    try {
-      const containerWidth = containerRef.current.offsetWidth;
-      const containerHeight = containerRef.current.offsetHeight;
+  // ✅ DEBOUNCED RESIZE HANDLER
+  const updateCanvasSize = useCallback(
+    debounce(() => {
+      if (fixedSize || !containerRef.current) return;
       
-      // Éviter les valeurs nulles ou trop petites qui causent des problèmes
-      if (containerWidth < 100 || containerHeight < 100) {
-        return;
-      }
-      
-      // Appliquer les limites maximales strictement
-      const constrainedWidth = Math.min(containerWidth || propWidth, maxWidth);
-      const constrainedHeight = Math.min(containerHeight || height, maxHeight);
-      
-      const validatedSize = validateDimensions(
-        constrainedWidth,
-        constrainedHeight,
-        400,
-        Math.max(maxWidth, 1200) // Limite absolue
-      );
-      
-      setCanvasSize(prevSize => {
-        // Éviter les mises à jour inutiles qui peuvent causer des boucles
-        const newWidth = Math.max(Math.min(validatedSize.width, maxWidth), 400);
-        const newHeight = Math.max(Math.min(validatedSize.height, maxHeight), 300);
+      try {
+        const containerWidth = containerRef.current.offsetWidth;
+        const containerHeight = containerRef.current.offsetHeight;
         
-        if (Math.abs(prevSize.width - newWidth) < 10 && Math.abs(prevSize.height - newHeight) < 10) {
-          return prevSize; // Pas de changement significatif
+        if (containerWidth < 100 || containerHeight < 100) {
+          return;
         }
         
-        return {
-          width: newWidth,
-          height: newHeight
-        };
-      });
-    } catch (_error) {
-      console.warn('Erreur lors de la mise à jour des dimensions:', error);
-    }
-  }, [propWidth, height, fixedSize, maxWidth, maxHeight]);
+        const constrainedWidth = Math.min(containerWidth || propWidth, maxWidth);
+        const constrainedHeight = Math.min(containerHeight || height, maxHeight);
+        
+        const validatedSize = validateDimensions(
+          constrainedWidth,
+          constrainedHeight,
+          400,
+          Math.max(maxWidth, 1200)
+        );
+        
+        setCanvasSize(prevSize => {
+          const newWidth = Math.max(Math.min(validatedSize.width, maxWidth), 400);
+          const newHeight = Math.max(Math.min(validatedSize.height, maxHeight), 300);
+          
+          if (Math.abs(prevSize.width - newWidth) < 10 && Math.abs(prevSize.height - newHeight) < 10) {
+            return prevSize;
+          }
+          
+          return { width: newWidth, height: newHeight };
+        });
+      } catch (error) {
+        logger.error('Erreur lors de la mise à jour des dimensions:', error);
+      }
+    }, 100),
+    [propWidth, height, fixedSize, maxWidth, maxHeight]
+  );
   
-  // Observer pour les changements de taille - OPTIMISÉ avec debounce
+  // ✅ OBSERVER OPTIMISÉ avec debounce
   useEffect(() => {
-    // Si fixedSize, utiliser les dimensions par défaut sans observer
     if (fixedSize) {
       const validatedSize = validateDimensions(propWidth, height, 400, maxWidth);
       setCanvasSize({
@@ -154,24 +180,21 @@ const Canvas = ({
       return;
     }
     
-    // Debounce pour éviter trop de mises à jour
     let timeoutId;
-    const debouncedUpdateCanvasSize = () => {
+    const debouncedUpdate = () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(updateCanvasSize, 100);
     };
     
-    debouncedUpdateCanvasSize();
+    debouncedUpdate();
     
-    const resizeObserver = new ResizeObserver(() => {
-      debouncedUpdateCanvasSize();
-    });
+    const resizeObserver = new ResizeObserver(debouncedUpdate);
     
     if (containerRef.current) {
       resizeObserver.observe(containerRef.current);
     }
     
-    const handleResize = () => debouncedUpdateCanvasSize();
+    const handleResize = () => debouncedUpdate();
     window.addEventListener('resize', handleResize);
     
     return () => {
@@ -192,7 +215,7 @@ const Canvas = ({
     }
   }, [selectedItem]);
   
-  // Désélectionner lorsqu'on clique ailleurs
+  // ✅ HANDLERS OPTIMISÉS
   const checkDeselect = useCallback((e) => {
     const clickedOnEmpty = e.target === e.target.getStage();
     if (clickedOnEmpty) {
@@ -204,7 +227,6 @@ const Canvas = ({
     }
   }, [onItemSelect]);
   
-  // Gérer la suppression avec la touche Delete
   const handleKeyDown = useCallback((e) => {
     if (e.keyCode === 46 && selectedId && editable) {
       if (selectedType === 'table') {
@@ -237,7 +259,6 @@ const Canvas = ({
     };
   }, [handleKeyDown]);
 
-  // Gérer la fin du drag & drop d'une table
   const handleTableDragEnd = useCallback((tableId, newPosition) => {
     if (!editable || !dragMode) return;
     
@@ -255,7 +276,6 @@ const Canvas = ({
     });
   }, [editable, dragMode, dispatch, onTableDragEnd]);
   
-  // Gérer la fin du drag & drop d'un obstacle
   const handleObstacleDragEnd = useCallback((obstacleId, newPosition) => {
     if (!editable || !obstaclesDraggable) return;
     
@@ -273,13 +293,11 @@ const Canvas = ({
     });
   }, [editable, obstaclesDraggable, dispatch, propOnObstacleDragEnd]);
 
-  // Gérer la sélection d'éléments
   const handleItemClick = useCallback((id, type) => {
     setSelectedId(id);
     setSelectedType(type);
     
     if (onItemSelect) {
-      // Trouver l'élément dans les données
       let item = null;
       if (type === 'table' && currentFloorPlan?.tables) {
         item = currentFloorPlan.tables.find(t => t.id === id);
@@ -293,9 +311,7 @@ const Canvas = ({
     }
   }, [onItemSelect, currentFloorPlan]);
   
-  // ===== VALIDATION ET SÉCURISATION DES DONNÉES =====
-  
-  // Obstacles validés et sécurisés
+  // ✅ VALIDATION OPTIMISÉE avec mémorisation
   const safeObstacles = useMemo(() => {
     if (!currentFloorPlan?.obstacles || !showObstacles) return [];
     
@@ -320,7 +336,6 @@ const Canvas = ({
     });
   }, [currentFloorPlan?.obstacles, showObstacles]);
   
-  // Tables validées et sécurisées
   const safeTables = useMemo(() => {
     if (!currentFloorPlan?.tables) return [];
     
@@ -345,7 +360,6 @@ const Canvas = ({
     });
   }, [currentFloorPlan?.tables]);
   
-  // Périmètre validé et sécurisé
   const safePerimeter = useMemo(() => {
     if (!currentFloorPlan?.perimeter || !showPerimeter || !Array.isArray(currentFloorPlan.perimeter)) {
       return [];
@@ -358,9 +372,7 @@ const Canvas = ({
     });
   }, [currentFloorPlan?.perimeter, showPerimeter]);
   
-  // ===== RENDU DES ÉLÉMENTS SÉCURISÉS =====
-  
-  // Dessiner le périmètre de manière sécurisée
+  // ✅ RENDU OPTIMISÉ avec mémorisation
   const renderPerimeter = useMemo(() => {
     if (safePerimeter.length < 3) return null;
     
@@ -373,25 +385,23 @@ const Canvas = ({
           points={points}
           closed={true}
           stroke={perimeterColor}
-          fill={`${perimeterColor}15`} // 15 pour une transparence légère
+          fill={`${perimeterColor}15`}
           strokeWidth={2}
           listening={false}
         />
       );
-    } catch (_error) {
-      console.warn('Erreur lors du rendu du périmètre:', error);
+    } catch (error) {
+      logger.error('Erreur lors du rendu du périmètre:', error);
       return null;
     }
   }, [safePerimeter, theme, currentFloorPlan?.perimeterColor]);
   
-  // Obstacles rendus de manière sécurisée
   const renderObstacles = useMemo(() => {
     return safeObstacles.map((obstacle) => {
       try {
         const isSelected = selectedId === obstacle.id && selectedType === 'obstacle';
         const isDraggable = editable && obstaclesDraggable && dragMode;
         
-        // Props communes pour tous les obstacles
         const commonProps = {
           key: obstacle.id,
           id: obstacle.id,
@@ -426,7 +436,6 @@ const Canvas = ({
           };
         }
         
-        // Rendu selon la forme
         if (obstacle.shape === 'rectangle') {
           return (
             <Rect
@@ -462,7 +471,6 @@ const Canvas = ({
           );
         }
         
-        // Forme par défaut (rectangle)
         return (
           <Rect
             {...commonProps}
@@ -473,8 +481,8 @@ const Canvas = ({
             rotation={obstacle.rotation}
           />
         );
-      } catch (_error) {
-        console.warn(`Erreur lors du rendu de l'obstacle ${obstacle.id}:`, error);
+      } catch (error) {
+        logger.error(`Erreur lors du rendu de l'obstacle ${obstacle.id}:`, error);
         return null;
       }
     }).filter(Boolean);
@@ -519,13 +527,11 @@ const Canvas = ({
     );
   }
   
-  // Couleurs d'arrière-plan du canvas selon le thème et la configuration du plan
   const bgColor = currentFloorPlan?.backgroundColor || (isDark ? '#1E1E1E' : '#f9f9f9');
   const strokeColor = isDark ? '#333333' : '#dddddd';
-  const gridEnabled = currentFloorPlan?.gridEnabled !== false; // Par défaut activé
+  const gridEnabled = currentFloorPlan?.gridEnabled !== false;
   const gridSize = currentFloorPlan?.gridSize || 20;
   
-  // Vérification finale des dimensions avant rendu avec limites strictes
   const finalCanvasWidth = Math.min(Math.max(canvasSize.width, 400), maxWidth);
   const finalCanvasHeight = Math.min(Math.max(canvasSize.height, 300), maxHeight);
   
@@ -578,7 +584,6 @@ const Canvas = ({
           onTouchStart={checkDeselect}
         >
           <Layer>
-            {/* Fond du plan de salle - DIMENSIONS VALIDÉES */}
             <Rect
               x={0}
               y={0}
@@ -590,7 +595,6 @@ const Canvas = ({
               listening={false}
             />
             
-            {/* Grille configurable */}
             {gridEnabled && (dragMode || debug) && Array.from({ length: Math.ceil(finalCanvasHeight / gridSize) }).map((_, index) => (
               <Rect
                 key={`grid-h-${index}`}
@@ -613,7 +617,7 @@ const Canvas = ({
                 x={index * gridSize}
                 y={0}
                 width={1}
-                height={finalCanvasHeight}
+                height={finalCanvasWidth}
                 fill="transparent"
                 stroke={theme.palette.divider}
                 strokeWidth={1}
@@ -623,15 +627,12 @@ const Canvas = ({
               />
             ))}
             
-            {/* Affichage du périmètre */}
             {renderPerimeter}
             
-            {/* Affichage des obstacles SÉCURISÉS */}
             <Group>
               {renderObstacles}
             </Group>
             
-            {/* Affichage des tables SÉCURISÉES */}
             <Group>
               {safeTables.map((table) => (
                 <TableShape
@@ -649,7 +650,6 @@ const Canvas = ({
           </Layer>
         </Stage>
         
-        {/* Indicateur de mode déplacement */}
         {dragMode && editable && (
           <Box
             sx={{
@@ -672,7 +672,6 @@ const Canvas = ({
         )}
       </Paper>
       
-      {/* Message de succès */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}

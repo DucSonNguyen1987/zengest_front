@@ -1,111 +1,50 @@
-/**
- * Ce fichier configure une instance Axios personnalisée avec:
- * - Configuration de base (URL, headers)
- * - Intercepteurs pour la gestion automatique des tokens
- * - Gestion des erreurs d'authentification (401)
- * - Intégration conditionnelle des mocks en développement
- */
+import axios from 'axios';
+import { getToken, removeToken } from './token';
+import setupMock from './mockAdapter';
 
-// Importation des modules nécessaires
-import axios from 'axios';                 // Bibliothèque principale pour les requêtes HTTP
-import { getToken, removeToken } from './token';  // Utilitaires pour manipuler le token JWT
-import setupMock from './mockAdapter';     // Configuration des mocks (utilisé en développement uniquement)
-
-// Récupération de l'URL de l'API depuis les variables d'environnement ou utilisation d'une URL par défaut
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 const ENABLE_MOCKS = import.meta.env.VITE_ENABLE_MOCKS === 'true' || import.meta.env.DEV;
 
-// Debug des variables d'environnement
-console.log('🔧 Configuration Axios:');
-console.log('- API_URL:', API_URL);
-console.log('- ENABLE_MOCKS:', ENABLE_MOCKS);
-console.log('- NODE_ENV:', import.meta.env.MODE);
-console.log('- DEV mode:', import.meta.env.DEV);
+// ✅ LOGS SIMPLIFIÉS
+const ENABLE_LOGS = import.meta.env.DEV && !import.meta.env.VITE_REDUCE_LOGS;
 
-/**
- * Création d'une instance Axios personnalisée
- * Cette instance sera utilisée pour toutes les requêtes API dans l'application
- */
+if (ENABLE_LOGS) {
+  console.log('🔧 Configuration Axios:', { API_URL, ENABLE_MOCKS });
+}
+
 const axiosInstance = axios.create({
-  baseURL: API_URL,                    // URL de base qui sera préfixée à toutes les requêtes
-  headers: {
-    'Content-Type': 'application/json',  // En-tête par défaut pour toutes les requêtes
-  },
-  timeout: 10000, // Timeout de 10 secondes
+  baseURL: API_URL,
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 10000,
 });
 
-/**
- * Intercepteur de requêtes
- * Exécuté avant chaque requête pour:
- * - Ajouter automatiquement le token JWT aux en-têtes si disponible
- */
+// ✅ INTERCEPTEURS SIMPLIFIÉS
 axiosInstance.interceptors.request.use(
-  (config) => { // ✅ CORRECTION: Retirer l'underscore
-    // Récupération du token JWT depuis le stockage local via notre utilitaire
+  (config) => {
     const token = getToken();
-    
-    // Si un token existe, l'ajouter à l'en-tête Authorization
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    // Log pour debug
-    console.log('📤 Requête:', config.method?.toUpperCase(), config.url);
-    
-    // Retour de la configuration modifiée
     return config;
   },
-  // En cas d'erreur lors de la préparation de la requête
-  (error) => {
-    console.error('❌ Erreur de requête:', error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-/**
- * Intercepteur de réponses
- * Exécuté après chaque réponse pour:
- * - Gérer les erreurs d'authentification (code 401)
- * - Rediriger vers la page de login si le token est invalide/expiré
- */
 axiosInstance.interceptors.response.use(
-  // Pour les réponses réussies, renvoyer simplement la réponse
-  (response) => {
-    console.log('📥 Réponse:', response.status, response.config.url);
-    return response;
-  },
-  
-  // Pour les erreurs, vérifier si c'est une erreur 401 (non autorisé)
+  (response) => response,
   (error) => {
-    console.error('❌ Erreur de réponse:', error.response?.status, error.config?.url);
-    
-    if (error.response && error.response.status === 401) {
-      // Si erreur 401, supprimer le token et rediriger vers la page de login
+    if (error.response?.status === 401) {
       removeToken();
-      
-      // Redirection vers la page de login
-      // Utilisation de window.location.href pour une redirection complète de la page
       window.location.href = '/login';
     }
-    
-    // Propager l'erreur pour qu'elle puisse être gérée ailleurs si nécessaire
     return Promise.reject(error);
   }
 );
 
-/**
- * Configuration des mocks en mode développement
- * Permet de développer le frontend sans avoir besoin d'un backend fonctionnel
- */
+// ✅ MOCKS SIMPLIFIÉS
 if (ENABLE_MOCKS) {
-  // Afficher un message dans la console pour indiquer que les mocks sont activés
-  console.log('🎭 API Mock activé en environnement de développement');
-  
-  // Configurer les mocks avec notre instance Axios
+  if (ENABLE_LOGS) console.log('🎭 API Mock activé');
   setupMock(axiosInstance);
-} else {
-  console.log('🌐 Utilisation de l\'API réelle:', API_URL);
 }
 
-// Exportation de l'instance Axios configurée pour utilisation dans toute l'application
 export default axiosInstance;

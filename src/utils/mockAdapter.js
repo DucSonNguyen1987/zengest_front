@@ -8,26 +8,16 @@ import {
   mockMenuItems
 } from '../mocks/data';
 
-/**
- * Génère un token JWT factice mais valide pour les mocks
- */
 const generateValidMockToken = (userId) => {
-  // Header JWT
-  const header = {
-    "alg": "HS256",
-    "typ": "JWT"
-  };
-
-  // Payload JWT avec expiration dans 24h
+  const header = { "alg": "HS256", "typ": "JWT" };
   const payload = {
     "sub": userId,
     "iat": Math.floor(Date.now() / 1000),
-    "exp": Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24h
+    "exp": Math.floor(Date.now() / 1000) + (24 * 60 * 60),
     "mock": true,
     "role": mockUsers.find(u => u.id === userId)?.role || 'guest'
   };
 
-  // Simuler l'encodage base64 d'un JWT
   const encodedHeader = btoa(JSON.stringify(header));
   const encodedPayload = btoa(JSON.stringify(payload));
   const fakeSignature = btoa(`mock-signature-${userId}-${Date.now()}`);
@@ -35,410 +25,129 @@ const generateValidMockToken = (userId) => {
   return `${encodedHeader}.${encodedPayload}.${fakeSignature}`;
 };
 
-/**
- * Configuration d'un adaptateur mock pour Axios avec logging amélioré
- */
 const setupMock = (axiosInstance) => {
-  console.log('🎭 Configuration du MockAdapter...');
+  // ✅ LOGS DÉSACTIVÉS TEMPORAIREMENT
+  const ENABLE_LOGS = false;
+  
+  const log = (message) => {
+    if (ENABLE_LOGS) console.log(`🎭 Mock: ${message}`);
+  };
   
   try {
-    // Création d'une nouvelle instance de MockAdapter
     const mock = new MockAdapter(axiosInstance, { 
-      delayResponse: 300, // Délai réduit pour le développement
-      onNoMatch: "throwException" // Lever une exception si aucune route n'est trouvée
+      delayResponse: 100, // Réduit à 100ms
+      onNoMatch: "throwException"
     });
 
-    console.log('📋 Configuration des routes mock...');
-
-    // ========== AUTHENTIFICATION ==========
-    
-    // Login
+    // ✅ AUTHENTIFICATION ULTRA-SIMPLIFIÉE
     mock.onPost('/auth/login').reply((config) => {
-      console.log('🔐 Mock: Tentative de connexion');
-      
       try {
         const { email, password } = JSON.parse(config.data);
-        console.log(`👤 Tentative de connexion pour: ${email}`);
-        
-        // Recherche de l'utilisateur
         const user = mockUsers.find(u => u.email === email);
         
         if (!user || user.password !== password) {
-          console.log('❌ Mock: Échec de l\'authentification');
           return [401, { message: 'Email ou mot de passe incorrect' }];
         }
         
-        // Ne pas envoyer le mot de passe dans la réponse
         const { password: _, ...userWithoutPassword } = user;
-        
-        // Générer un token JWT valide
         const validToken = generateValidMockToken(user.id);
         
-        console.log(`✅ Mock: Connexion réussie pour ${user.firstName} ${user.lastName} (${user.role})`);
-        console.log(`🎫 Token généré: ${validToken.substring(0, 50)}...`);
-        
-        return [200, {
-          user: userWithoutPassword,
-          token: validToken
-        }];
+        return [200, { user: userWithoutPassword, token: validToken }];
       } catch (error) {
-        console.error('❌ Mock: Erreur lors du parsing des données de login:', error);
         return [400, { message: 'Données invalides' }];
       }
     });
     
-    // Register
     mock.onPost('/auth/register').reply((config) => {
-      console.log('📝 Mock: Tentative d\'inscription');
-      
       try {
         const userData = JSON.parse(config.data);
         
-        // Vérification si l'email existe déjà
         if (mockUsers.some(u => u.email === userData.email)) {
-          console.log('❌ Mock: Email déjà utilisé');
           return [400, { message: 'Cet email est déjà utilisé' }];
         }
         
-        // Création d'un nouvel utilisateur
         const newUser = {
           id: `user-${mockUsers.length + 1}`,
           ...userData,
           createdAt: new Date().toISOString()
         };
         
-        // Ajout de l'utilisateur au mock (uniquement pour la session)
         mockUsers.push(newUser);
-        
-        console.log(`✅ Mock: Inscription réussie pour ${newUser.email}`);
         return [201, { message: 'Inscription réussie' }];
       } catch (error) {
-        console.error('❌ Mock: Erreur lors de l\'inscription:', error);
         return [400, { message: 'Données invalides' }];
       }
     });
     
-    // Récupération des données utilisateur
     mock.onGet('/auth/me').reply((config) => {
-      console.log('👤 Mock: Récupération des données utilisateur');
-      
-      // Extraire le token de l'en-tête Authorization
       const authHeader = config.headers.Authorization;
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        console.log('❌ Mock: Token manquant ou invalide');
-        return [401, { message: 'Token d\'authentification requis' }];
+        return [401, { message: 'Token requis' }];
       }
       
-      const token = authHeader.substring(7); // Enlever "Bearer "
+      const token = authHeader.substring(7);
       
       try {
-        // Décoder le payload du token JWT mock
         const parts = token.split('.');
-        if (parts.length !== 3) {
-          console.log('❌ Mock: Format de token invalide');
-          return [401, { message: 'Token invalide' }];
-        }
+        if (parts.length !== 3) return [401, { message: 'Token invalide' }];
         
         const payload = JSON.parse(atob(parts[1]));
-        const userId = payload.sub;
+        const user = mockUsers.find(u => u.id === payload.sub);
         
-        // Trouver l'utilisateur correspondant
-        const user = mockUsers.find(u => u.id === userId);
-        if (!user) {
-          console.log('❌ Mock: Utilisateur non trouvé');
-          return [401, { message: 'Utilisateur non trouvé' }];
-        }
-        
-        // Vérifier l'expiration du token
-        const currentTime = Math.floor(Date.now() / 1000);
-        if (payload.exp < currentTime) {
-          console.log('❌ Mock: Token expiré');
-          return [401, { message: 'Token expiré' }];
-        }
+        if (!user) return [401, { message: 'Utilisateur non trouvé' }];
         
         const { password: _, ...userWithoutPassword } = user;
-        console.log(`✅ Mock: Données utilisateur récupérées pour ${userWithoutPassword.firstName}`);
         return [200, userWithoutPassword];
-        
       } catch (error) {
-        console.error('❌ Mock: Erreur lors du décodage du token:', error);
         return [401, { message: 'Token invalide' }];
       }
     });
     
-    // Logout
-    mock.onPost('/auth/logout').reply((_config) => {
-      console.log('🚪 Mock: Déconnexion');
-      return [200, { message: 'Déconnexion réussie' }];
-    });
+    mock.onPost('/auth/logout').reply(() => [200, { message: 'Déconnexion réussie' }]);
 
-    // ========== ROLES UTILISATEURS ==========
-    
-    mock.onGet('/user-roles').reply((_config) => {
-      console.log('🏷️ Mock: Récupération des rôles utilisateurs');
-      return [200, mockUserRoles];
-    });
-    
-    // Récupération d'un rôle spécifique
-    mock.onGet(/\/user-roles\/\w+/).reply((config) => {
-      const roleId = config.url.split('/').pop();
-      console.log(`🏷️ Mock: Récupération du rôle ${roleId}`);
-      
-      const role = mockUserRoles.find(r => r.id === roleId);
-      
-      if (!role) {
-        console.log(`❌ Mock: Rôle ${roleId} non trouvé`);
-        return [404, { message: 'Rôle non trouvé' }];
-      }
-      
-      return [200, role];
-    });
-
-    // ========== FLOOR PLANS ==========
-    
-    // Données fictives pour les plans de salle avec tokens valides
+    // ✅ FLOOR PLANS SIMPLIFIÉS
     const mockFloorPlans = [
       {
         id: '1',
         name: 'Salle principale',
-        description: 'Rez-de-chaussée, 20 tables',
+        description: 'Rez-de-chaussée',
         tables: [
-          {
-            id: '101',
-            label: 'Table 1',
-            capacity: 4,
-            shape: 'rectangle',
-            color: '#3498db',
-            x: 100,
-            y: 100,
-            width: 80,
-            height: 80,
-            rotation: 0
-          },
-          {
-            id: '102',
-            label: 'Table 2',
-            capacity: 2,
-            shape: 'circle',
-            color: '#e74c3c',
-            x: 250,
-            y: 120,
-            width: 60,
-            height: 60,
-            rotation: 0
-          },
-          {
-            id: '103',
-            label: 'Table 3',
-            capacity: 6,
-            shape: 'rectangle',
-            color: '#2ecc71',
-            x: 150,
-            y: 250,
-            width: 120,
-            height: 80,
-            rotation: 0
-          }
+          { id: '101', label: 'Table 1', capacity: 4, shape: 'rectangle', color: '#3498db', x: 100, y: 100, width: 80, height: 80, rotation: 0 },
+          { id: '102', label: 'Table 2', capacity: 2, shape: 'circle', color: '#e74c3c', x: 250, y: 120, width: 60, height: 60, rotation: 0 }
         ],
         obstacles: [],
         perimeter: [],
         capacityLimit: 50
-      },
-      {
-        id: '2',
-        name: 'Terrasse',
-        description: 'Extérieur, 8 tables',
-        tables: [
-          {
-            id: '201',
-            label: 'Terrasse 1',
-            capacity: 4,
-            shape: 'circle',
-            color: '#f39c12',
-            x: 80,
-            y: 80,
-            width: 70,
-            height: 70,
-            rotation: 0
-          },
-          {
-            id: '202',
-            label: 'Terrasse 2',
-            capacity: 4,
-            shape: 'circle',
-            color: '#f39c12',
-            x: 200,
-            y: 80,
-            width: 70,
-            height: 70,
-            rotation: 0
-          }
-        ],
-        obstacles: [],
-        perimeter: [],
-        capacityLimit: 32
       }
     ];
 
-    // GET /floor-plans - Récupération de tous les plans
-    mock.onGet('/floor-plans').reply((_config) => {
-      console.log('🏗️ Mock: Récupération des plans de salle');
-      return [200, mockFloorPlans];
-    });
-
-    // GET /floor-plans/:id - Récupération d'un plan spécifique
+    mock.onGet('/floor-plans').reply(() => [200, mockFloorPlans]);
     mock.onGet(/\/floor-plans\/\w+/).reply((config) => {
       const id = config.url.split('/').pop();
-      console.log(`🏗️ Mock: Récupération du plan ${id}`);
-      
-      const floorPlan = mockFloorPlans.find(plan => plan.id === id);
-      
-      if (!floorPlan) {
-        console.log(`❌ Mock: Plan ${id} non trouvé`);
-        return [404, { message: 'Plan de salle non trouvé' }];
-      }
-      
-      return [200, floorPlan];
+      const plan = mockFloorPlans.find(p => p.id === id);
+      return plan ? [200, plan] : [404, { message: 'Plan non trouvé' }];
     });
 
-    // POST /floor-plans - Création d'un nouveau plan
     mock.onPost('/floor-plans').reply((config) => {
-      console.log('🏗️ Mock: Création d\'un nouveau plan');
-      
       try {
-        const floorPlanData = JSON.parse(config.data);
-        
-        const newFloorPlan = {
-          id: Date.now().toString(),
-          ...floorPlanData,
-          tables: floorPlanData.tables || [],
-          obstacles: floorPlanData.obstacles || [],
-          perimeter: floorPlanData.perimeter || [],
-          capacityLimit: floorPlanData.capacityLimit || 50
-        };
-        
-        console.log(`✅ Mock: Plan créé avec l'ID ${newFloorPlan.id}`);
-        return [201, newFloorPlan];
+        const data = JSON.parse(config.data);
+        const newPlan = { id: Date.now().toString(), ...data };
+        return [201, newPlan];
       } catch (error) {
-        console.error('❌ Mock: Erreur lors de la création du plan:', error);
         return [400, { message: 'Données invalides' }];
       }
     });
 
-    // PUT /floor-plans/:id - Mise à jour d'un plan
-    mock.onPut(/\/floor-plans\/\w+/).reply((config) => {
-      const id = config.url.split('/').pop();
-      console.log(`🏗️ Mock: Mise à jour du plan ${id}`);
-      
-      try {
-        const updatedData = JSON.parse(config.data);
-        
-        const floorPlanIndex = mockFloorPlans.findIndex(plan => plan.id === id);
-        
-        if (floorPlanIndex === -1) {
-          console.log(`❌ Mock: Plan ${id} non trouvé pour mise à jour`);
-          return [404, { message: 'Plan de salle non trouvé' }];
-        }
-        
-        const updatedFloorPlan = {
-          ...mockFloorPlans[floorPlanIndex],
-          ...updatedData,
-          id // Préserver l'ID d'origine
-        };
-        
-        console.log(`✅ Mock: Plan ${id} mis à jour`);
-        return [200, updatedFloorPlan];
-      } catch (error) {
-        console.error('❌ Mock: Erreur lors de la mise à jour:', error);
-        return [400, { message: 'Données invalides' }];
-      }
-    });
-
-    // DELETE /floor-plans/:id - Suppression d'un plan
-    mock.onDelete(/\/floor-plans\/\w+/).reply((config) => {
-      const id = config.url.split('/').pop();
-      console.log(`🏗️ Mock: Suppression du plan ${id}`);
-      
-      const floorPlanIndex = mockFloorPlans.findIndex(plan => plan.id === id);
-      
-      if (floorPlanIndex === -1) {
-        console.log(`❌ Mock: Plan ${id} non trouvé pour suppression`);
-        return [404, { message: 'Plan de salle non trouvé' }];
-      }
-      
-      console.log(`✅ Mock: Plan ${id} supprimé`);
-      return [200, { id }];
-    });
-
-    // ========== AUTRES ROUTES ==========
-    
-    // Tables
-    mock.onGet('/tables').reply((_config) => {
-      console.log('🪑 Mock: Récupération des tables');
-      return [200, mockTables];
-    });
-    
-    // Réservations
-    mock.onGet('/reservations').reply((config) => {
-      console.log('📅 Mock: Récupération des réservations');
-      console.log('📋 Paramètres de la requête:', config.params);
-      
-      // Gestion des filtres optionnels
-      let filteredReservations = [...mockReservations];
-      
-      if (config.params) {
-        if (config.params.date) {
-          filteredReservations = filteredReservations.filter(r => 
-            r.date.startsWith(config.params.date)
-          );
-        }
-        if (config.params.status) {
-          filteredReservations = filteredReservations.filter(r => 
-            r.status === config.params.status
-          );
-        }
-      }
-      
-      return [200, filteredReservations];
-    });
-    
-    // Commandes
-    mock.onGet('/orders').reply((_config) => {
-      console.log('🍽️ Mock: Récupération des commandes');
-      return [200, mockOrders];
-    });
-    
-    // Menu items
-    mock.onGet('/menu-items').reply((_config) => {
-      console.log('📋 Mock: Récupération du menu');
-      return [200, mockMenuItems];
-    });
-
-    // Gestion des routes non mockées
-    mock.onAny().reply((config) => {
-      console.warn(`⚠️ Mock: Route non trouvée: ${config.method?.toUpperCase()} ${config.url}`);
-      return [404, { message: `Route non trouvée: ${config.method?.toUpperCase()} ${config.url}` }];
-    });
-
-    console.log('✅ MockAdapter configuré avec succès');
-    console.log('📊 Routes mockées disponibles:');
-    console.log('  - POST /auth/login (avec tokens JWT valides)');
-    console.log('  - POST /auth/register');
-    console.log('  - GET  /auth/me');
-    console.log('  - POST /auth/logout');
-    console.log('  - GET  /user-roles');
-    console.log('  - GET  /floor-plans');
-    console.log('  - POST /floor-plans');
-    console.log('  - PUT  /floor-plans/:id');
-    console.log('  - DELETE /floor-plans/:id');
-    console.log('  - GET  /tables');
-    console.log('  - GET  /reservations');
-    console.log('  - GET  /orders');
-    console.log('  - GET  /menu-items');
+    // Autres routes simplifiées
+    mock.onGet('/user-roles').reply(() => [200, mockUserRoles]);
+    mock.onGet('/tables').reply(() => [200, mockTables]);
+    mock.onGet('/reservations').reply(() => [200, mockReservations]);
+    mock.onGet('/orders').reply(() => [200, mockOrders]);
+    mock.onGet('/menu-items').reply(() => [200, mockMenuItems]);
+    mock.onAny().reply(() => [404, { message: 'Route non trouvée' }]);
 
   } catch (error) {
-    console.error('❌ Erreur lors de la configuration du MockAdapter:', error);
-    throw error;
+    console.error('Erreur MockAdapter:', error);
   }
 };
 

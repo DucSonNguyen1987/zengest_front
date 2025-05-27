@@ -1,33 +1,35 @@
 import React, { useCallback, useMemo } from 'react';
 import { Group, Rect, Circle, Text } from 'react-konva';
+import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
 
 const TableShape = React.memo(({
   table,
-  tableData, // Compatibilité avec l'ancien nom
+  tableData,
   isSelected = false,
-  selected = false, // Compatibilité avec l'ancien nom
+  selected = false,
   onSelect,
   draggable = false,
   isDarkMode = false,
   onDragEnd,
   dragBorderColor = '#1976d2'
 }) => {
-  // Utiliser table ou tableData pour la compatibilité
+  // Monitoring des performances uniquement en mode debug
+  if (import.meta.env.VITE_ENABLE_PERFORMANCE_MONITORING) {
+    usePerformanceMonitor('TableShape');
+  }
+  
   const tableInfo = table || tableData;
   
-  // Validation et sécurisation des données - CRITIQUE
+  // ✅ VALIDATION OPTIMISÉE avec cache
   const safeTable = useMemo(() => {
     if (!tableInfo) return null;
     
-    // Validation stricte des dimensions pour éviter l'erreur Konva
     const width = Math.max(Number(tableInfo.width) || 80, 20);
     const height = Math.max(Number(tableInfo.height) || 80, 20);
     const x = Number(tableInfo.x) || 0;
     const y = Number(tableInfo.y) || 0;
     
-    // Vérifications de sécurité supplémentaires
     if (isNaN(width) || isNaN(height) || isNaN(x) || isNaN(y)) {
-      console.warn('TableShape: Invalid dimensions detected, using defaults');
       return {
         id: tableInfo.id || 'unknown',
         x: 100,
@@ -56,17 +58,14 @@ const TableShape = React.memo(({
     };
   }, [tableInfo]);
   
-  // Déterminer si la table est sélectionnée
   const isTableSelected = isSelected || selected;
   
-  // Gestionnaire de clic optimisé
   const handleClick = useCallback(() => {
     if (onSelect && safeTable) {
       onSelect(safeTable);
     }
   }, [onSelect, safeTable]);
   
-  // Gestionnaire de fin de drag optimisé
   const handleDragEnd = useCallback((e) => {
     if (!onDragEnd) return;
     
@@ -77,12 +76,12 @@ const TableShape = React.memo(({
       };
       
       onDragEnd(newPosition);
-    } catch (_error) {
+    } catch (error) {
       console.warn('TableShape: Error in drag end handler:', error);
     }
   }, [onDragEnd]);
   
-  // Couleurs et styles optimisés
+  // ✅ STYLES MÉMORISÉS
   const styles = useMemo(() => {
     if (!safeTable) return {};
     
@@ -103,12 +102,10 @@ const TableShape = React.memo(({
     };
   }, [safeTable, isTableSelected, dragBorderColor]);
   
-  // Ne pas rendre si les données sont invalides
   if (!safeTable || safeTable.width <= 0 || safeTable.height <= 0) {
     return null;
   }
   
-  // Calculer la taille du texte proportionnellement avec limites de sécurité
   const fontSize = Math.max(Math.min(safeTable.width, safeTable.height) * 0.2, 10);
   const textColor = isDarkMode ? '#ffffff' : '#333333';
   
@@ -123,7 +120,6 @@ const TableShape = React.memo(({
         onTap={handleClick}
         rotation={safeTable.rotation}
       >
-        {/* Forme de la table avec validation des dimensions */}
         {safeTable.shape === 'circle' ? (
           <Circle
             radius={Math.max(safeTable.width / 2, 10)}
@@ -142,7 +138,6 @@ const TableShape = React.memo(({
           />
         )}
         
-        {/* Texte avec le numéro de capacité */}
         <Text
           text={safeTable.capacity.toString()}
           fontSize={Math.max(fontSize, 10)}
@@ -157,7 +152,6 @@ const TableShape = React.memo(({
           listening={false}
         />
         
-        {/* Label de la table si disponible */}
         {safeTable.label && safeTable.label !== `Table ${safeTable.id}` && (
           <Text
             text={safeTable.label}
@@ -173,10 +167,22 @@ const TableShape = React.memo(({
         )}
       </Group>
     );
-  } catch (_error) {
+  } catch (error) {
     console.warn('TableShape: Render error:', error);
     return null;
   }
+}, (prevProps, nextProps) => {
+  // ✅ COMPARAISON OPTIMISÉE pour éviter les re-renders
+  return (
+    prevProps.table?.id === nextProps.table?.id &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.table?.x === nextProps.table?.x &&
+    prevProps.table?.y === nextProps.table?.y &&
+    prevProps.table?.width === nextProps.table?.width &&
+    prevProps.table?.height === nextProps.table?.height &&
+    prevProps.draggable === nextProps.draggable &&
+    prevProps.isDarkMode === nextProps.isDarkMode
+  );
 });
 
 TableShape.displayName = 'TableShape';
