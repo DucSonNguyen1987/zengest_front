@@ -1,7 +1,54 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
-  // Importez les actions de votre slice
+  Box,
+  Typography,
+  Button,
+  Card,
+  CardContent,
+  CardActions,
+  Grid,
+  Fab,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Chip,
+  Alert,
+  Snackbar,
+  Drawer,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  ListItemButton,
+  Divider,
+  useMediaQuery,
+  Tooltip,
+  Badge,
+  Paper,
+  CircularProgress
+} from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Save as SaveIcon,
+  Visibility as ViewIcon,
+  TableRestaurant as TableIcon,
+  People as PeopleIcon,
+  Close as CloseIcon,
+  Menu as MenuIcon,
+  Fullscreen as FullscreenIcon,
+  Download as DownloadIcon,
+  Share as ShareIcon
+} from '@mui/icons-material';
+
+// Imports des actions Redux
+import { 
   fetchFloorPlansStart,
   fetchFloorPlansSuccess,
   fetchFloorPlansFailure,
@@ -14,536 +61,530 @@ import {
   deleteFloorPlanStart,
   deleteFloorPlanSuccess,
   deleteFloorPlanFailure,
-  addTable, 
-  updateTable, 
-  deleteTable, 
-  setCurrentFloorPlan,
-  // Nouvelle action pour le déplacement des tables
-  updateTablePosition 
+  setCurrentFloorPlan
 } from '../../store/slices/floorPlanSlice';
-import { 
-  Layout, 
-  Button, 
-  List, 
-  Card, 
-  Modal, 
-  message, 
-  Popconfirm, 
-  Typography, 
-  Space, 
-  Divider, 
-  Empty, 
-  Spin,
-  Row,
-  Col,
-  Drawer,
-  Tooltip
-} from 'antd';
-import { 
-  PlusOutlined, 
-  EditOutlined, 
-  DeleteOutlined, 
-  SaveOutlined, 
-  TableOutlined,
-  MenuOutlined,
-  EyeOutlined,
-  LayoutOutlined,
-  DragOutlined
-} from '@ant-design/icons';
-import Canvas from '../../components/floorPlan/Canvas';
-import TableForm from '../../components/floorPlan/TableForm';
+
+// Imports des composants
+import FloorPlanEditor from '../../components/floorPlan/FloorPlanEditor';
 import FloorPlanForm from '../../components/floorPlan/FloorPlanForm';
+import Canvas from '../../components/floorPlan/Canvas';
+import ErrorBoundary from '../../components/common/ErrorBoundary';
+
+// Imports des utilitaires
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission, PERMISSIONS } from '../../utils/permissions';
-// Importez le nouveau service
+import { useColorMode } from '../../context/ThemeContext';
 import floorPlanService from '../../services/floorPlanService';
-import FloorPlanEditor from '../../components/floorPlan/FloorPlanEditor';
-import ErrorBoundary from '../../components/common/ErrorBoundary';
-const { Content, Sider } = Layout;
-const { Title, Text } = Typography;
 
 const FloorPlanManagement = () => {
+  const theme = useTheme();
+  const { mode } = useColorMode();
+  const isDark = mode === 'dark';
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  
+  // Sélecteurs Redux
   const { floorPlans, currentFloorPlan, loading } = useSelector(state => state.floorPlan);
   
-  const [floorPlanModalVisible, setFloorPlanModalVisible] = useState(false);
-  const [tableModalVisible, setTableModalVisible] = useState(false);
-  const [currentTable, setCurrentTable] = useState(null);
-  const [isEditingFloorPlan, setIsEditingFloorPlan] = useState(false);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [dragMode, setDragMode] = useState(false);
-  
-  // Responsive design
-  const [screenWidth, setScreenWidth] = useState(window.innerWidth);
-  const isMobile = screenWidth < 768;
-  
-  useEffect(() => {
-    const handleResize = () => setScreenWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-  
-  // Vérification des permissions
-const isDevelopment = true; // En production, utilisez process.env.NODE_ENV === 'development'
-const canEdit = isDevelopment ? true : hasPermission(user?.role, PERMISSIONS.EDIT_PROJECTS);
-const canDelete = isDevelopment ? true : hasPermission(user?.role, PERMISSIONS.DELETE_PROJECTS);  
-  
+  // États locaux
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState('create'); // 'create', 'edit', 'view'
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState(null);
 
-// Chargement initial des plans
+  // Vérification des permissions
+  const canView = hasPermission(user?.role, PERMISSIONS.VIEW_PROJECTS);
+  const canEdit = hasPermission(user?.role, PERMISSIONS.EDIT_PROJECTS);
+  const canDelete = hasPermission(user?.role, PERMISSIONS.DELETE_PROJECTS);
+
+  // Fonction pour afficher les notifications
+  const showNotification = useCallback((message, severity = 'success') => {
+    setNotification({ open: true, message, severity });
+  }, []);
+
+  // Chargement initial des plans
   useEffect(() => {
     const loadFloorPlans = async () => {
       try {
         dispatch(fetchFloorPlansStart());
         const data = await floorPlanService.getAll();
         dispatch(fetchFloorPlansSuccess(data));
-      } catch (_error) {
+      } catch (error) {
         dispatch(fetchFloorPlansFailure(error.message));
-        message.error('Erreur lors du chargement des plans');
+        showNotification('Erreur lors du chargement des plans', 'error');
       }
     };
     
-    loadFloorPlans();
-  }, [dispatch]);
-  
-  // Gestion des plans de salle
-  const handleCreateFloorPlan = async (floorPlanData) => {
-    try {
-      dispatch(createFloorPlanStart());
-      const data = await floorPlanService.create(floorPlanData);
-      dispatch(createFloorPlanSuccess(data));
-      setFloorPlanModalVisible(false);
-      message.success('Plan de salle créé avec succès');
-    } catch (_error) {
-      dispatch(createFloorPlanFailure(error.message));
-      message.error('Erreur lors de la création du plan');
+    if (canView) {
+      loadFloorPlans();
     }
-  };
-  
-  const handleUpdateFloorPlan = async (floorPlanData) => {
-    try {
-      dispatch(updateFloorPlanStart());
-      const data = await floorPlanService.update(floorPlanData.id, floorPlanData);
-      dispatch(updateFloorPlanSuccess(data));
-      setFloorPlanModalVisible(false);
-      message.success('Plan de salle mis à jour avec succès');
-    } catch (_error) {
-      dispatch(updateFloorPlanFailure(error.message));
-      message.error('Erreur lors de la mise à jour du plan');
+  }, [dispatch, canView, showNotification]);
+
+  // Gestion des paramètres URL pour ouvrir le dialog de création
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'create' && canEdit) {
+      handleCreatePlan();
+      setSearchParams({}); // Nettoyer l'URL
     }
+  }, [searchParams, canEdit]);
+
+  // Gestionnaires d'événements
+  const handleCreatePlan = () => {
+    if (!canEdit) {
+      showNotification('Vous n\'avez pas la permission de créer des plans', 'error');
+      return;
+    }
+    setDialogMode('create');
+    setSelectedPlan(null);
+    setDialogOpen(true);
   };
-  
-  const handleDeleteFloorPlan = async (id) => {
+
+  const handleEditPlan = (plan) => {
+    if (!canEdit) {
+      showNotification('Vous n\'avez pas la permission de modifier des plans', 'error');
+      return;
+    }
+    setDialogMode('edit');
+    setSelectedPlan(plan);
+    dispatch(setCurrentFloorPlan(plan));
+    setDialogOpen(true);
+  };
+
+  const handleViewPlan = (plan) => {
+    setDialogMode('view');
+    setSelectedPlan(plan);
+    dispatch(setCurrentFloorPlan(plan));
+    setDialogOpen(true);
+  };
+
+  const handleDeleteClick = (plan) => {
+    if (!canDelete) {
+      showNotification('Vous n\'avez pas la permission de supprimer des plans', 'error');
+      return;
+    }
+    setPlanToDelete(plan);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!planToDelete) return;
+    
     try {
       dispatch(deleteFloorPlanStart());
-      await floorPlanService.delete(id);
-      dispatch(deleteFloorPlanSuccess(id));
-      message.success('Plan de salle supprimé avec succès');
-    } catch (_error) {
+      await floorPlanService.delete(planToDelete.id);
+      dispatch(deleteFloorPlanSuccess(planToDelete.id));
+      showNotification('Plan supprimé avec succès');
+      setDeleteConfirmOpen(false);
+      setPlanToDelete(null);
+    } catch (error) {
       dispatch(deleteFloorPlanFailure(error.message));
-      message.error('Erreur lors de la suppression du plan');
+      showNotification('Erreur lors de la suppression', 'error');
     }
   };
-  
-  // Gestion des tables
-  const handleAddTable = (tableData) => {
-    const newTable = {
-      ...tableData,
-      id: Date.now().toString(), // Génération d'un ID temporaire
-      x: 50, // Position initiale X
-      y: 50, // Position initiale Y
-    };
-    dispatch(addTable(newTable));
-    setTableModalVisible(false);
-    message.success('Table ajoutée au plan');
-  };
-  
-  const handleUpdateTable = (tableData) => {
-    dispatch(updateTable(tableData));
-    setTableModalVisible(false);
-    message.success('Table mise à jour');
-  };
-  
-  const saveCurrentFloorPlan = async () => {
-    if (currentFloorPlan) {
-      try {
+
+  const handleSavePlan = async (planData) => {
+    try {
+      if (dialogMode === 'create') {
+        dispatch(createFloorPlanStart());
+        const data = await floorPlanService.create(planData);
+        dispatch(createFloorPlanSuccess(data));
+        showNotification('Plan créé avec succès');
+      } else if (dialogMode === 'edit') {
         dispatch(updateFloorPlanStart());
-        const data = await floorPlanService.update(currentFloorPlan.id, currentFloorPlan);
+        const data = await floorPlanService.update(planData.id, planData);
         dispatch(updateFloorPlanSuccess(data));
-        message.success('Plan de salle enregistré avec succès');
-      } catch (_error) {
-        dispatch(updateFloorPlanFailure(error.message));
-        message.error('Erreur lors de l\'enregistrement du plan');
+        showNotification('Plan mis à jour avec succès');
       }
+      setDialogOpen(false);
+    } catch (error) {
+      const action = dialogMode === 'create' ? createFloorPlanFailure : updateFloorPlanFailure;
+      dispatch(action(error.message));
+      showNotification(`Erreur lors de la ${dialogMode === 'create' ? 'création' : 'mise à jour'}`, 'error');
     }
   };
-  
-  // Sélection d'un plan
-  const handleSelectFloorPlan = (floorPlan) => {
-    dispatch(setCurrentFloorPlan(floorPlan));
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false);
+    setSelectedPlan(null);
+  };
+
+  const handleSelectPlan = (plan) => {
+    dispatch(setCurrentFloorPlan(plan));
     if (isMobile) {
-      setDrawerVisible(false);
+      setDrawerOpen(false);
     }
   };
-  
-  // Édition d'une table existante
-  const handleEditTable = (table) => {
-    setCurrentTable(table);
-    setTableModalVisible(true);
-  };
-  
-  // Gestion du mode drag & drop
-  const toggleDragMode = () => {
-    setDragMode(!dragMode);
-    message.info(dragMode 
-      ? 'Mode déplacement désactivé' 
-      : 'Mode déplacement activé - Vous pouvez maintenant déplacer les tables'
+
+  // Calcul des statistiques
+  const getStatistics = () => {
+    const totalTables = floorPlans.reduce((sum, plan) => sum + (plan.tables?.length || 0), 0);
+    const totalCapacity = floorPlans.reduce((sum, plan) => 
+      sum + (plan.tables?.reduce((tableSum, table) => tableSum + (table.capacity || 0), 0) || 0), 0
     );
+    
+    return {
+      totalPlans: floorPlans.length,
+      totalTables,
+      totalCapacity,
+      averageCapacity: totalTables > 0 ? Math.round(totalCapacity / totalTables) : 0
+    };
   };
-  
-  // Callback pour le drag & drop
-  const handleTableDragEnd = (tableId, newPosition) => {
-    dispatch(updateTablePosition({ tableId, position: newPosition }));
-  };
-  
-  // Configuration du Sider pour les versions mobile et desktop
-  const renderFloorPlansList = () => (
-    <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <Title level={4} style={{ margin: 0 }}>Plans disponibles</Title>
+
+  const stats = getStatistics();
+
+  // Rendu du contenu des plans
+  const renderPlanCard = (plan) => (
+    <Card 
+      key={plan.id}
+      elevation={2}
+      sx={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        transition: 'all 0.3s ease',
+        '&:hover': {
+          elevation: 4,
+          transform: 'translateY(-4px)',
+          boxShadow: `0 8px 25px ${alpha(theme.palette.primary.main, 0.15)}`,
+        },
+        border: currentFloorPlan?.id === plan.id 
+          ? `2px solid ${theme.palette.primary.main}` 
+          : `1px solid ${theme.palette.divider}`,
+      }}
+    >
+      <CardContent sx={{ flexGrow: 1, p: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+          <Typography variant="h6" component="h3" sx={{ fontWeight: 600 }}>
+            {plan.name}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            {plan.tables && (
+              <Chip 
+                label={`${plan.tables.length} tables`} 
+                size="small" 
+                color="primary"
+                variant="outlined"
+              />
+            )}
+          </Box>
+        </Box>
+        
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          {plan.description || 'Aucune description'}
+        </Typography>
+        
+        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <TableIcon fontSize="small" color="primary" />
+            <Typography variant="body2">
+              {plan.tables?.length || 0} tables
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <PeopleIcon fontSize="small" color="primary" />
+            <Typography variant="body2">
+              {plan.tables?.reduce((sum, table) => sum + (table.capacity || 0), 0) || 0} places
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Aperçu miniature du plan */}
+        <Box 
+          sx={{ 
+            height: 120, 
+            border: `1px solid ${theme.palette.divider}`, 
+            borderRadius: 1,
+            overflow: 'hidden',
+            backgroundColor: alpha(theme.palette.background.default, 0.5),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          {plan.tables && plan.tables.length > 0 ? (
+            <Canvas
+              editable={false}
+              height={118}
+              width={200}
+              dragMode={false}
+              fixedSize={true}
+              maxWidth={200}
+              maxHeight={118}
+            />
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              Plan vide
+            </Typography>
+          )}
+        </Box>
+      </CardContent>
+      
+      <CardActions sx={{ p: 2, pt: 0 }}>
+        <Button 
+          size="small" 
+          startIcon={<ViewIcon />}
+          onClick={() => handleViewPlan(plan)}
+        >
+          Voir
+        </Button>
         {canEdit && (
           <Button 
-            type="primary" 
-            icon={<PlusOutlined />} 
-            onClick={() => {
-              setIsEditingFloorPlan(false);
-              setFloorPlanModalVisible(true);
-            }}
+            size="small" 
+            startIcon={<EditIcon />}
+            onClick={() => handleEditPlan(plan)}
           >
-            Nouveau
+            Éditer
           </Button>
         )}
-      </div>
-      
-      {floorPlans.length === 0 ? (
-        <Empty description="Aucun plan de salle disponible" />
-      ) : (
-        <List
-          dataSource={floorPlans}
-          renderItem={(plan) => (
-            <List.Item style={{ padding: '4px 0' }}>
-              <Card 
-                title={plan.name} 
-                size="small"
-                style={{ 
-                  width: '100%',
-                  cursor: 'pointer',
-                  border: currentFloorPlan?.id === plan.id ? '2px solid #1890ff' : '1px solid #eee'
-                }}
-                onClick={() => handleSelectFloorPlan(plan)}
-                actions={[
-                  canEdit && (
-                    <EditOutlined 
-                      key="edit" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsEditingFloorPlan(true);
-                        dispatch(setCurrentFloorPlan(plan));
-                        setFloorPlanModalVisible(true);
-                      }}
-                    />
-                  ),
-                  canDelete && (
-                    <Popconfirm
-                      title="Êtes-vous sûr de vouloir supprimer ce plan?"
-                      onConfirm={(e) => {
-                        e.stopPropagation();
-                        handleDeleteFloorPlan(plan.id);
-                      }}
-                      okText="Oui"
-                      cancelText="Non"
-                    >
-                      <DeleteOutlined 
-                        key="delete" 
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </Popconfirm>
-                  )
-                ].filter(Boolean)}
-              >
-                <Text type="secondary">{plan.description}</Text>
-                <div>
-                  <Text>
-                    {plan.tables ? `${plan.tables.length} tables` : '0 table'}
-                  </Text>
-                </div>
-              </Card>
-            </List.Item>
-          )}
-        />
-      )}
-    </>
+        {canDelete && (
+          <Button 
+            size="small" 
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => handleDeleteClick(plan)}
+          >
+            Supprimer
+          </Button>
+        )}
+      </CardActions>
+    </Card>
   );
-  
-  // Rendu de l'interface
+
+  // Vérification des permissions
+  if (!canView) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">
+          Vous n'avez pas la permission d'accéder aux plans de salle.
+        </Alert>
+      </Box>
+    );
+  }
+
   return (
-    <Layout style={{ background: '#fff', padding: '0', minHeight: 'calc(100vh - 64px)', marginTop: '2vh' }}>
-      <Content style={{ padding: isMobile ? '10px' : '20px' }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: '15px' 
-        }}>
-          <Title level={2} style={{ margin: 0 }}>Plans de Salle</Title>
-          
-          {isMobile && (
-            <Button 
-              type="primary" 
-              icon={<MenuOutlined />} 
-              onClick={() => setDrawerVisible(true)}
+    <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
+      {/* En-tête */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        mb: 3,
+        flexWrap: 'wrap',
+        gap: 2
+      }}>
+        <Box>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
+            Plans de Salle
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Gérez vos plans de salle et l'agencement de votre restaurant
+          </Typography>
+        </Box>
+        
+        {canEdit && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleCreatePlan}
+            size="large"
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              boxShadow: `0 4px 14px ${alpha(theme.palette.primary.main, 0.3)}`,
+            }}
+          >
+            Nouveau plan
+          </Button>
+        )}
+      </Box>
+
+      {/* Statistiques */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={6} sm={3}>
+          <Paper sx={{ p: 2, textAlign: 'center' }}>
+            <Typography variant="h4" color="primary" sx={{ fontWeight: 700 }}>
+              {stats.totalPlans}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Plans de salle
+            </Typography>
+          </Paper>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Paper sx={{ p: 2, textAlign: 'center' }}>
+            <Typography variant="h4" color="primary" sx={{ fontWeight: 700 }}>
+              {stats.totalTables}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Tables total
+            </Typography>
+          </Paper>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Paper sx={{ p: 2, textAlign: 'center' }}>
+            <Typography variant="h4" color="primary" sx={{ fontWeight: 700 }}>
+              {stats.totalCapacity}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Places total
+            </Typography>
+          </Paper>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Paper sx={{ p: 2, textAlign: 'center' }}>
+            <Typography variant="h4" color="primary" sx={{ fontWeight: 700 }}>
+              {stats.averageCapacity}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Places/table
+            </Typography>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* Contenu principal */}
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <CircularProgress size={60} />
+        </Box>
+      ) : floorPlans.length === 0 ? (
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <TableIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h6" gutterBottom>
+            Aucun plan de salle
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Créez votre premier plan de salle pour commencer à organiser votre restaurant.
+          </Typography>
+          {canEdit && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleCreatePlan}
             >
-              Plans
+              Créer mon premier plan
             </Button>
           )}
-        </div>
-        
-        {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '50px' }}>
-            <Spin size="large" fullscreen tip="Chargement des plans de salle..." />
-          </div>
-        ) : (
-          <Layout style={{ background: '#fff', marginTop: '20px' }}>
-            {!isMobile && (
-              <Sider 
-                width={280} 
-                style={{ 
-                  background: '#f5f5f5', 
-                  padding: '15px', 
-                  borderRadius: '4px',
-                  marginRight: '20px',
-                  height: 'calc(100vh - 200px)',
-                  overflow: 'auto'
-                }}
-              >
-                {renderFloorPlansList()}
-              </Sider>
-            )}
-            
-            <Content style={{ padding: isMobile ? '0' : '0 10px' }}>
-              <div style={{ marginBottom: '15px', display: 'flex', justifyContent: 'space-between' }}>
-                <Title level={4} style={{ margin: 0 }}>
-                  {currentFloorPlan ? (
-                    `${currentFloorPlan.name}`
-                  ) : (
-                    'Éditeur de plan'
-                  )}
-                </Title>
-                
-                <Space>
-                  {currentFloorPlan && (
-                    <>
-                      {canEdit && (
-                        <>
-                          <Tooltip title="Éditer le plan">
-                            <Button
-                              icon={<LayoutOutlined />}
-                              onClick={() => {
-                                setIsEditingFloorPlan(true);
-                                setFloorPlanModalVisible(true);
-                              }}
-                              size={isMobile ? "small" : "middle"}
-                            >
-                              {!isMobile && "Éditer plan"}
-                            </Button>
-                          </Tooltip>
-                          
-                          <Tooltip title="Activer/Désactiver le mode déplacement">
-                            <Button
-                              type={dragMode ? "primary" : "default"}
-                              icon={<DragOutlined />}
-                              onClick={toggleDragMode}
-                              size={isMobile ? "small" : "middle"}
-                            >
-                              {!isMobile && (dragMode ? "Désactiver déplacement" : "Activer déplacement")}
-                            </Button>
-                          </Tooltip>
-                          
-                          <Tooltip title="Ajouter une table">
-                            <Button
-                              icon={<TableOutlined />}
-                              onClick={() => {
-                                setCurrentTable(null);
-                                setTableModalVisible(true);
-                              }}
-                              size={isMobile ? "small" : "middle"}
-                            >
-                              {!isMobile && "Ajouter table"}
-                            </Button>
-                          </Tooltip>
-                          
-                          <Tooltip title="Enregistrer les modifications">
-                            <Button
-                              type="primary"
-                              icon={<SaveOutlined />}
-                              onClick={saveCurrentFloorPlan}
-                              size={isMobile ? "small" : "middle"}
-                            >
-                              {!isMobile && "Enregistrer"}
-                            </Button>
-                          </Tooltip>
-                        </>
-                      )}
-                    </>
-                  )}
-                </Space>
-              </div>
-              
-              <div style={{ 
-                border: '1px solid #f0f0f0', 
-                borderRadius: '4px', 
-                minHeight: isMobile ? '300px' : '400px',
-                marginBottom: '20px'
-              }}>
-                <Canvas 
-                  editable={canEdit} 
-                  height={isMobile ? 300 : 400} 
-                  width={800}
-                  dragMode={dragMode}
-                  onTableDragEnd={handleTableDragEnd}
-                  // Props pour l'affichage principal (pas d'édition de périmètre ici)
-                  perimeterEditMode={false}
-                  // NOUVELLES PROPS POUR CORRIGER LE PROBLÈME DANS LA VUE PRINCIPALE
-                  fixedSize={false}
-                  maxWidth={1200}
-                  maxHeight={600}
-                />
-              </div>
-              
-              {currentFloorPlan && currentFloorPlan.tables && currentFloorPlan.tables.length > 0 && (
-                <div style={{ marginTop: '10px' }}>
-                  <Divider orientation="left" style={{ margin: '10px 0' }}>Tables</Divider>
-                  <Row gutter={[8, 8]}>
-                    {currentFloorPlan.tables.map((table) => (
-                      <Col key={table.id} xs={12} sm={8} md={6} lg={4}>
-                        <Card
-                          size="small"
-                          title={table.label}
-                          style={{ height: '100%' }}
-                          actions={canEdit ? [
-                            <Tooltip title="Éditer cette table">
-                              <EditOutlined key="edit" onClick={() => handleEditTable(table)} />
-                            </Tooltip>,
-                            <Popconfirm
-                              title="Supprimer cette table?"
-                              onConfirm={() => dispatch(deleteTable(table.id))}
-                              okText="Oui"
-                              cancelText="Non"
-                            >
-                              <Tooltip title="Supprimer cette table">
-                                <DeleteOutlined key="delete" />
-                              </Tooltip>
-                            </Popconfirm>
-                          ] : [
-                            <EyeOutlined key="view" onClick={() => handleEditTable(table)} />
-                          ]}
-                        >
-                          <p style={{ margin: '0 0 5px 0' }}>Capacité: {table.capacity} pers.</p>
-                          <div 
-                            style={{ 
-                              width: '100%', 
-                              height: '15px', 
-                              background: table.color || '#f0f0f0',
-                              borderRadius: '4px'
-                            }} 
-                          />
-                        </Card>
-                      </Col>
-                    ))}
-                  </Row>
-                </div>
-              )}
-            </Content>
-          </Layout>
-        )}
-        
-        {/* Drawer pour mobile */}
-        <Drawer
-          title="Plans de salle"
-          placement="left"
-          onClose={() => setDrawerVisible(false)}
-          open={drawerVisible}
-          width={280}
+        </Paper>
+      ) : (
+        <Grid container spacing={3}>
+          {floorPlans.map(renderPlanCard)}
+        </Grid>
+      )}
+
+      {/* FAB pour mobile */}
+      {canEdit && isMobile && (
+        <Fab
+          color="primary"
+          aria-label="add"
+          onClick={handleCreatePlan}
+          sx={{
+            position: 'fixed',
+            bottom: 16,
+            right: 16,
+          }}
         >
-          {renderFloorPlansList()}
-        </Drawer>
-      </Content>
-      
-      {/* Modal pour créer/éditer un plan - RESTAURÉE AVEC TOUTES LES FONCTIONNALITÉS */}
-      <Modal
-        title={isEditingFloorPlan ? "Modifier le plan de salle" : "Créer un nouveau plan de salle"}
-        open={floorPlanModalVisible}
-        onCancel={() => setFloorPlanModalVisible(false)}
-        footer={null}
-        width={1200} // Largeur augmentée pour l'éditeur complet
-        style={{ top: 20 }}
-        styles={{
-          body: { 
-            maxHeight: '85vh', 
-            overflowY: 'auto',
-            padding: '16px'
+          <AddIcon />
+        </Fab>
+      )}
+
+      {/* Dialog principal */}
+      <Dialog
+        open={dialogOpen}
+        onClose={handleCloseDialog}
+        maxWidth="xl"
+        fullWidth
+        fullScreen={isMobile}
+        PaperProps={{
+          sx: {
+            minHeight: '80vh',
+            ...(isMobile && { m: 0, height: '100vh' })
           }
         }}
       >
-        {isEditingFloorPlan ? (
-          // Utilisation du FloorPlanEditor complet pour l'édition
+        <DialogTitle sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center' 
+        }}>
+          <Typography variant="h6">
+            {dialogMode === 'create' ? 'Nouveau plan de salle' : 
+             dialogMode === 'edit' ? 'Modifier le plan de salle' : 
+             'Visualiser le plan de salle'}
+          </Typography>
+          <IconButton onClick={handleCloseDialog}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        
+        <DialogContent sx={{ p: 0 }}>
           <ErrorBoundary>
-            <FloorPlanEditor 
-              currentFloorPlan={currentFloorPlan}
-              editable={canEdit}
-              onSaveFloorPlan={(updatedPlan) => {
-                handleUpdateFloorPlan(updatedPlan);
-                setFloorPlanModalVisible(false);
-              }}
-            />
+            {dialogMode === 'create' ? (
+              <FloorPlanForm
+                onSubmit={handleSavePlan}
+                showAdvancedConfig={true}
+              />
+            ) : (
+              <FloorPlanEditor
+                currentFloorPlan={selectedPlan}
+                editable={canEdit && dialogMode === 'edit'}
+                onSaveFloorPlan={handleSavePlan}
+              />
+            )}
           </ErrorBoundary>
-        ) : (
-          // Formulaire amélioré pour la création avec configuration avancée
-          <ErrorBoundary>
-            <FloorPlanForm
-              onSubmit={handleCreateFloorPlan}
-              initialValues={null}
-              isEdit={false}
-              showAdvancedConfig={true} // Activer la configuration avancée pour la création
-            />
-          </ErrorBoundary>
-        )}
-      </Modal>
-      
-      {/* Modal pour ajouter/éditer une table */}
-      <Modal
-        title={currentTable ? "Modifier la table" : "Ajouter une table"}
-        open={tableModalVisible}
-        onCancel={() => {
-          setTableModalVisible(false);
-          setCurrentTable(null);
-        }}
-        footer={null}
-        styles={{
-          body: { 
-            padding: '16px'
-          }
-        }}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de confirmation de suppression */}
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
       >
-        <ErrorBoundary>
-          <TableForm
-            onSubmit={currentTable ? handleUpdateTable : handleAddTable}
-            initialValues={currentTable}
-            isEdit={!!currentTable}
-          />
-        </ErrorBoundary>
-      </Modal>
-    </Layout>
+        <DialogTitle>Confirmer la suppression</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Êtes-vous sûr de vouloir supprimer le plan "{planToDelete?.name}" ? 
+            Cette action est irréversible.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteConfirmOpen(false)}>
+            Annuler
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm} 
+            color="error" 
+            variant="contained"
+          >
+            Supprimer
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Notifications */}
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={() => setNotification(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setNotification(prev => ({ ...prev, open: false }))}
+          severity={notification.severity}
+          variant="filled"
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 };
 

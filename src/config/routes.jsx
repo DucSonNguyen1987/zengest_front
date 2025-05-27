@@ -9,13 +9,18 @@ import NotFound from '../pages/errors/NotFound';
 import FloorPlanManagement from '../pages/floorPlan/FloorPlanManagement';
 
 import ProtectedRoute from '../components/auth/ProtectedRoute';
-import { ROLES } from '../utils/permissions';
+import { ROLES, PERMISSIONS } from '../utils/permissions';
 
-// Configuration minimale des routes - à adapter selon vos besoins
+// Composant pour rediriger selon le rôle
+const RoleBasedRedirect = () => {
+  return <Navigate to="/dashboard" replace />;
+};
+
+// Configuration complète des routes
 const routes = [
   {
     path: '/',
-    element: <Navigate to="/dashboard" replace />,
+    element: <RoleBasedRedirect />,
   },
   {
     path: '/',
@@ -34,7 +39,9 @@ const routes = [
   {
     path: '/',
     element: (
+      <ProtectedRoute>
         <DashboardLayout />
+      </ProtectedRoute>
     ),
     children: [
       {
@@ -44,12 +51,90 @@ const routes = [
       {
         path: 'floor-plans',
         element: (
-          <ProtectedRoute requiredRole={ROLES.MANAGER}>
+          <ProtectedRoute requiredPermission={PERMISSIONS.VIEW_PROJECTS}>
             <FloorPlanManagement />
           </ProtectedRoute>
         ),
       },
+      {
+        path: 'floor-plans/:id',
+        element: (
+          <ProtectedRoute requiredPermission={PERMISSIONS.VIEW_PROJECTS}>
+            <FloorPlanManagement />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'floor-plans/:id/edit',
+        element: (
+          <ProtectedRoute requiredPermission={PERMISSIONS.EDIT_PROJECTS}>
+            <FloorPlanManagement />
+          </ProtectedRoute>
+        ),
+      },
+      // Routes supplémentaires pour les fonctionnalités futures
+      {
+        path: 'reservations',
+        element: (
+          <ProtectedRoute>
+            <div>Réservations (à implémenter)</div>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'orders',
+        element: (
+          <ProtectedRoute>
+            <div>Commandes (à implémenter)</div>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'users',
+        element: (
+          <ProtectedRoute requiredPermission={PERMISSIONS.VIEW_USERS}>
+            <div>Gestion utilisateurs (à implémenter)</div>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'settings',
+        element: (
+          <ProtectedRoute requiredPermission={PERMISSIONS.EDIT_SETTINGS}>
+            <div>Paramètres (à implémenter)</div>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'profile',
+        element: (
+          <ProtectedRoute>
+            <div>Profil utilisateur (à implémenter)</div>
+          </ProtectedRoute>
+        ),
+      },
     ],
+  },
+  // Page d'erreur pour accès non autorisé
+  {
+    path: '/unauthorized',
+    element: (
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '100vh',
+        padding: '20px',
+        textAlign: 'center'
+      }}>
+        <h1>Accès non autorisé</h1>
+        <p>Vous n'avez pas les permissions nécessaires pour accéder à cette page.</p>
+        <button onClick={() => window.history.back()}>
+          Retour
+        </button>
+      </div>
+    ),
   },
   {
     path: '*',

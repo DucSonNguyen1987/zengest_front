@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import { hasPermission } from '../../utils/permissions';
 import { useColorMode } from '../../context/ThemeContext';
+import { FloorPlanStatus } from '../../components/floorPlan/FloorPlanQuickActions';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -173,6 +174,7 @@ const Dashboard = () => {
               icon={ProjectIcon}
               color="secondary"
             />
+            <FloorPlanStatus />
           </Grid>
         )}
         
