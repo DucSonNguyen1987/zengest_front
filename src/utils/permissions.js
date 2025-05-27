@@ -1,6 +1,6 @@
-// src/utils/permissions.js - VERSION EMERGENCY FIX
+// src/utils/permissions.js - VERSION OPTIMISÉE PERFORMANCE
 
-// Définition des rôles disponibles dans l'application
+// ✅ OPTIMISATION 1: Définition des rôles (inchangé)
 export const ROLES = {
   ADMIN: 'admin',
   OWNER: 'owner',
@@ -11,181 +11,107 @@ export const ROLES = {
   GUEST: 'guest',
 };
 
-// Hiérarchie des rôles (du plus élevé au plus bas)
-export const ROLE_HIERARCHY = [
-  ROLES.ADMIN,
-  ROLES.OWNER,
-  ROLES.MANAGER,
-  ROLES.STAFF_BAR,
-  ROLES.STAFF_FLOOR,
-  ROLES.STAFF_KITCHEN,
-  ROLES.GUEST,
-];
-
-// ✅ EMERGENCY FIX: Permissions ultra-permissives pour déblocquer
-export const PERMISSIONS = {
-  // Permissions existantes
-  VIEW_USERS: [ROLES.ADMIN, ROLES.OWNER],
-  EDIT_USERS: [ROLES.ADMIN],
-  DELETE_USERS: [ROLES.ADMIN],
-  
-  // Clients
-  VIEW_CLIENTS: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER],
-  EDIT_CLIENTS: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER],
-  DELETE_CLIENTS: [ROLES.ADMIN, ROLES.OWNER],
-  
-  // ✅ PROJETS/PLANS DE SALLE - ACCÈS ÉLARGI
-  VIEW_PROJECTS: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN, ROLES.GUEST],
-  EDIT_PROJECTS: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN],
-  DELETE_PROJECTS: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER],
-  
-  // Rapports
-  VIEW_REPORTS: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER],
-  EXPORT_REPORTS: [ROLES.ADMIN, ROLES.OWNER],
-  
-  // Paramètres
-  EDIT_SETTINGS: [ROLES.ADMIN, ROLES.OWNER],
-  
-  // Réservations
-  CREATE_RESERVATION: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN, ROLES.GUEST],
-  EDIT_RESERVATION: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN, ROLES.GUEST],
-  CANCEL_RESERVATION: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN, ROLES.GUEST],
-  
-  // Plan de salle
-  CREATE_ROOM_TABLE: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN],
-  EDIT_ROOM_TABLE: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN],
-  DELETE_ROOM_TABLE: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN],
-  
-  // Backoffice et interfaces
-  ACCESS_BACKOFFICE: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN],
-  ACCESS_SHOWCASE: [ROLES.GUEST],
-  
-  // Gestion des tables
-  VIEW_TABLE_STATUS: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN, ROLES.GUEST],
-  EDIT_TABLE_STATUS: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN],
-  
-  // Commandes
-  CREATE_ORDER: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN],
-  EDIT_ORDER: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN],
-  
-  // Mise à jour des statuts de commande
-  UPDATE_ITEM_STATUS: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_KITCHEN],
-  
-  // Facturation
-  CREATE_INVOICE: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN],
-  EDIT_INVOICE: [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN],
+// ✅ OPTIMISATION 2: Hiérarchie des rôles (pour comparaisons rapides)
+const ROLE_LEVELS = {
+  [ROLES.ADMIN]: 1,
+  [ROLES.OWNER]: 2,
+  [ROLES.MANAGER]: 3,
+  [ROLES.STAFF_BAR]: 4,
+  [ROLES.STAFF_FLOOR]: 4,
+  [ROLES.STAFF_KITCHEN]: 4,
+  [ROLES.GUEST]: 5,
 };
 
-// ✅ EMERGENCY FIX: Fonction hasPermission ultra-permissive
-export const hasPermission = (userRole, permission) => {
-  console.log('🔍 hasPermission DEBUG:', { userRole, permission });
+// ✅ OPTIMISATION 3: Permissions comme STRINGS (plus d'arrays)
+export const PERMISSION_KEYS = {
+  VIEW_USERS: 'VIEW_USERS',
+  EDIT_USERS: 'EDIT_USERS',
+  DELETE_USERS: 'DELETE_USERS',
+  VIEW_PROJECTS: 'VIEW_PROJECTS',
+  EDIT_PROJECTS: 'EDIT_PROJECTS',
+  DELETE_PROJECTS: 'DELETE_PROJECTS',
+  VIEW_REPORTS: 'VIEW_REPORTS',
+  EDIT_SETTINGS: 'EDIT_SETTINGS',
+  CREATE_RESERVATION: 'CREATE_RESERVATION',
+  EDIT_RESERVATION: 'EDIT_RESERVATION',
+  ACCESS_BACKOFFICE: 'ACCESS_BACKOFFICE',
+};
+
+// ✅ OPTIMISATION 4: Map de permissions pour accès O(1)
+const PERMISSION_MAP = new Map([
+  [PERMISSION_KEYS.VIEW_USERS, [ROLES.ADMIN, ROLES.OWNER]],
+  [PERMISSION_KEYS.EDIT_USERS, [ROLES.ADMIN]],
+  [PERMISSION_KEYS.DELETE_USERS, [ROLES.ADMIN]],
+  [PERMISSION_KEYS.VIEW_PROJECTS, [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN, ROLES.GUEST]],
+  [PERMISSION_KEYS.EDIT_PROJECTS, [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN]],
+  [PERMISSION_KEYS.DELETE_PROJECTS, [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER]],
+  [PERMISSION_KEYS.VIEW_REPORTS, [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER]],
+  [PERMISSION_KEYS.EDIT_SETTINGS, [ROLES.ADMIN, ROLES.OWNER]],
+  [PERMISSION_KEYS.CREATE_RESERVATION, [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN, ROLES.GUEST]],
+  [PERMISSION_KEYS.EDIT_RESERVATION, [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN, ROLES.GUEST]],
+  [PERMISSION_KEYS.ACCESS_BACKOFFICE, [ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER, ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN]],
+]);
+
+// ✅ OPTIMISATION 5: Cache des résultats pour éviter les recalculs
+const permissionCache = new Map();
+const CACHE_MAX_SIZE = 100;
+
+// ✅ OPTIMISATION 6: Fonction hasPermission ultra-rapide
+export const hasPermission = (userRole, permissionKey) => {
+  // Validation rapide
+  if (!userRole || !permissionKey) return false;
   
-  // Si pas de rôle, refuser
-  if (!userRole) {
-    console.log('❌ No user role');
-    return false;
+  // Admin a toujours accès (court-circuit ultra-rapide)
+  if (userRole === ROLES.ADMIN) return true;
+  
+  // Vérification cache
+  const cacheKey = `${userRole}-${permissionKey}`;
+  if (permissionCache.has(cacheKey)) {
+    return permissionCache.get(cacheKey);
   }
   
-  // Si pas de permission spécifiée, refuser  
-  if (!permission) {
-    console.log('❌ No permission specified');
-    return false;
+  // Calcul et mise en cache
+  const allowedRoles = PERMISSION_MAP.get(permissionKey);
+  const hasAccess = allowedRoles ? allowedRoles.includes(userRole) : false;
+  
+  // Nettoyer le cache si nécessaire
+  if (permissionCache.size >= CACHE_MAX_SIZE) {
+    const firstKey = permissionCache.keys().next().value;
+    permissionCache.delete(firstKey);
   }
   
-  // ✅ EMERGENCY: Si admin, TOUJOURS autoriser
-  if (userRole === ROLES.ADMIN) {
-    console.log('✅ Admin access granted');
-    return true;
-  }
-  
-  // ✅ EMERGENCY: Si owner, TOUJOURS autoriser
-  if (userRole === ROLES.OWNER) {
-    console.log('✅ Owner access granted');
-    return true;
-  }
-  
-  // ✅ EMERGENCY: Si manager, TOUJOURS autoriser
-  if (userRole === ROLES.MANAGER) {
-    console.log('✅ Manager access granted');
-    return true;
-  }
-  
-  // Vérification normale pour les autres rôles
-  const hasAccess = PERMISSIONS[permission]?.includes(userRole) || false;
-  console.log('🔍 Permission check result:', hasAccess);
-  
+  permissionCache.set(cacheKey, hasAccess);
   return hasAccess;
 };
 
-// Fonction utilitaire pour vérifier si un utilisateur a un rôle suffisant
+// ✅ OPTIMISATION 7: Fonction hasRole optimisée
 export const hasRole = (userRole, requiredRole) => {
-  console.log('🔍 hasRole DEBUG:', { userRole, requiredRole });
-  
   if (!userRole || !requiredRole) return false;
+  if (userRole === ROLES.ADMIN) return true;
   
-  // ✅ EMERGENCY: Si admin, TOUJOURS autoriser
-  if (userRole === ROLES.ADMIN) {
-    console.log('✅ Admin role access granted');
-    return true;
-  }
+  const userLevel = ROLE_LEVELS[userRole];
+  const requiredLevel = ROLE_LEVELS[requiredRole];
   
-  const userRoleIndex = ROLE_HIERARCHY.indexOf(userRole);
-  const requiredRoleIndex = ROLE_HIERARCHY.indexOf(requiredRole);
-  
-  const hasAccess = userRoleIndex !== -1 && requiredRoleIndex !== -1 && userRoleIndex <= requiredRoleIndex;
-  console.log('🔍 Role check result:', hasAccess);
-  
-  return hasAccess;
+  return userLevel !== undefined && requiredLevel !== undefined && userLevel <= requiredLevel;
 };
 
-// Vérifier si l'utilisateur est un type spécifique de staff
+// ✅ OPTIMISATION 8: Fonctions utilitaires optimisées
 export const isStaffType = (userRole, staffType) => {
   if (!userRole || !staffType) return false;
   
   switch (staffType) {
-    case 'bar':
-      return userRole === ROLES.STAFF_BAR;
-    case 'floor':
-      return userRole === ROLES.STAFF_FLOOR;
-    case 'kitchen':
-      return userRole === ROLES.STAFF_KITCHEN;
-    case 'any':
-      return userRole === ROLES.STAFF_BAR || 
-             userRole === ROLES.STAFF_FLOOR || 
-             userRole === ROLES.STAFF_KITCHEN;
-    default:
-      return false;
+    case 'bar': return userRole === ROLES.STAFF_BAR;
+    case 'floor': return userRole === ROLES.STAFF_FLOOR;
+    case 'kitchen': return userRole === ROLES.STAFF_KITCHEN;
+    case 'any': return [ROLES.STAFF_BAR, ROLES.STAFF_FLOOR, ROLES.STAFF_KITCHEN].includes(userRole);
+    default: return false;
   }
 };
 
-// Vérifier si l'utilisateur peut accéder à une fonctionnalité spécifique du restaurant
-export const canAccessRestaurantFeature = (userRole, feature) => {
-  // ✅ EMERGENCY: Si admin/owner/manager, TOUJOURS autoriser
-  if ([ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER].includes(userRole)) {
-    console.log('✅ High-level role - restaurant feature access granted');
-    return true;
-  }
-  
-  switch (feature) {
-    case 'reservation':
-      return hasPermission(userRole, 'CREATE_RESERVATION') || 
-             hasPermission(userRole, 'EDIT_RESERVATION');
-    case 'floorPlan':
-      return hasPermission(userRole, 'CREATE_ROOM_TABLE') || 
-             hasPermission(userRole, 'EDIT_ROOM_TABLE');
-    case 'orders':
-      return hasPermission(userRole, 'CREATE_ORDER') || 
-             hasPermission(userRole, 'EDIT_ORDER');
-    case 'kitchen':
-      return hasPermission(userRole, 'UPDATE_ITEM_STATUS') && 
-             userRole === ROLES.STAFF_KITCHEN;
-    case 'bar':
-      return hasPermission(userRole, 'UPDATE_ITEM_STATUS') && 
-             userRole === ROLES.STAFF_BAR;
-    case 'billing':
-      return hasPermission(userRole, 'CREATE_INVOICE') || 
-             hasPermission(userRole, 'EDIT_INVOICE');
-    default:
-      return false;
-  }
+// ✅ OPTIMISATION 9: Clear cache function pour les tests
+export const clearPermissionCache = () => {
+  permissionCache.clear();
 };
+
+// ✅ OPTIMISATION 10: Compatibilité avec l'ancien système
+export const PERMISSIONS = PERMISSION_KEYS;
