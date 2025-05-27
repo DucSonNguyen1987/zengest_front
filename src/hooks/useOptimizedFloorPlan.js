@@ -13,6 +13,7 @@ import {
 
 /**
  * Hook optimisé pour les floor plans avec mémorisation
+ * ✅ CORRIGÉ: Hooks appelés au niveau racine uniquement
  */
 export const useOptimizedFloorPlan = () => {
   const dispatch = useDispatch();
@@ -41,16 +42,33 @@ export const useOptimizedFloorPlan = () => {
     [tables]
   );
   
-  // Actions mémorisées
+  // ✅ CORRECTION: Actions définies avec useCallback au niveau racine
+  const addTableAction = useCallback((table) => dispatch(addTable(table)), [dispatch]);
+  const updateTableAction = useCallback((tableId, updates) => dispatch(updateTable({ tableId, updates })), [dispatch]);
+  const deleteTableAction = useCallback((tableId) => dispatch(deleteTable(tableId)), [dispatch]);
+  const updateTablePositionAction = useCallback((tableId, position) => dispatch(updateTablePosition({ tableId, position })), [dispatch]);
+  const addObstacleAction = useCallback((obstacle) => dispatch(addObstacle(obstacle)), [dispatch]);
+  const removeObstacleAction = useCallback((obstacleId) => dispatch(removeObstacle(obstacleId)), [dispatch]);
+  const switchFloorPlanAction = useCallback((floorPlanId) => dispatch(switchFloorPlan(floorPlanId)), [dispatch]);
+  
+  // ✅ CORRECTION: Objet d'actions mémorisé sans hooks à l'intérieur
   const actions = useMemo(() => ({
-    addTable: useCallback((table) => dispatch(addTable(table)), [dispatch]),
-    updateTable: useCallback((tableId, updates) => dispatch(updateTable({ tableId, updates })), [dispatch]),
-    deleteTable: useCallback((tableId) => dispatch(deleteTable(tableId)), [dispatch]),
-    updateTablePosition: useCallback((tableId, position) => dispatch(updateTablePosition({ tableId, position })), [dispatch]),
-    addObstacle: useCallback((obstacle) => dispatch(addObstacle(obstacle)), [dispatch]),
-    removeObstacle: useCallback((obstacleId) => dispatch(removeObstacle(obstacleId)), [dispatch]),
-    switchFloorPlan: useCallback((floorPlanId) => dispatch(switchFloorPlan(floorPlanId)), [dispatch])
-  }), [dispatch]);
+    addTable: addTableAction,
+    updateTable: updateTableAction,
+    deleteTable: deleteTableAction,
+    updateTablePosition: updateTablePositionAction,
+    addObstacle: addObstacleAction,
+    removeObstacle: removeObstacleAction,
+    switchFloorPlan: switchFloorPlanAction
+  }), [
+    addTableAction,
+    updateTableAction,
+    deleteTableAction,
+    updateTablePositionAction,
+    addObstacleAction,
+    removeObstacleAction,
+    switchFloorPlanAction
+  ]);
   
   return {
     ...floorPlanState,
