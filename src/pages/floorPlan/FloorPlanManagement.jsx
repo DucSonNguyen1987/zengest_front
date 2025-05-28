@@ -42,7 +42,8 @@ import {
   Settings as SettingsIcon,
   Speed as SpeedIcon,
   GetApp as GetAppIcon,
-  ArrowBack as ArrowBackIcon
+  ArrowBack as ArrowBackIcon,
+  ContentCopy as CopyIcon
 } from '@mui/icons-material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -84,14 +85,18 @@ const FloorPlanManagement = () => {
     tables,
     obstacles,
     currentCapacity,
+    statistics,
     loading,
     error,
     addTable,
     updateTable,
     deleteTable,
     addObstacle,
+    updateObstacle,
     removeObstacle,
-    switchFloorPlan
+    switchFloorPlan,
+    getObstacleById,
+    duplicateObstacle
   } = useOptimizedFloorPlan();
 
   // États locaux
@@ -99,6 +104,7 @@ const FloorPlanManagement = () => {
   const [selectedTool, setSelectedTool] = useState(TOOLS.SELECT);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showTableForm, setShowTableForm] = useState(false);
+  const [showObstacleForm, setShowObstacleForm] = useState(false);
   const [showPlanForm, setShowPlanForm] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState(null);
@@ -162,16 +168,23 @@ const FloorPlanManagement = () => {
   const handleAddObstacle = useCallback(() => {
     if (!canEdit) return;
     
+    // ✅ MISE À JOUR: Utiliser une configuration plus intelligente
+    const obstacleNumber = obstacles.length + 1;
     const newObstacle = {
       id: `obstacle-${Date.now()}`,
       type: 'obstacle',
+      category: 'mur',
+      name: `Mur ${obstacleNumber}`,
       shape: 'rectangle',
-      color: '#FF6384',
-      x: 100 + (obstacles.length * 15),
-      y: 100 + (obstacles.length * 15),
-      width: 100,
-      height: 30,
-      rotation: 0
+      color: '#8B4513',
+      x: 100 + (obstacles.length * 20),
+      y: 100 + (obstacles.length * 20),
+      width: 150,
+      height: 20,
+      rotation: 0,
+      description: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
     
     addObstacle(newObstacle);
@@ -186,13 +199,13 @@ const FloorPlanManagement = () => {
       updateTable(selectedItem.id, updates);
       showMessage('Table mise à jour');
     } else if (selectedItem.type === 'obstacle') {
-      // Pour les obstacles, on utiliserait updateObstacle si disponible
-      // Temporairement, on met juste à jour l'état local
+      // ✅ NOUVELLE IMPLÉMENTATION: Utiliser updateObstacle
+      updateObstacle(selectedItem.id, updates);
       showMessage('Obstacle mis à jour');
     }
     
     setSelectedItem(prev => prev ? { ...prev, ...updates } : null);
-  }, [selectedItem, canEdit, updateTable, showMessage]);
+  }, [selectedItem, canEdit, updateTable, updateObstacle, showMessage]);
 
   const handleItemDelete = useCallback(() => {
     if (!selectedItem || !canDelete) return;
@@ -253,6 +266,20 @@ const FloorPlanManagement = () => {
     showMessage('Table ajoutée avec succès');
   }, [canEdit, addTable, showMessage]);
 
+  const handleQuickAddObstacle = useCallback((obstacleData) => {
+    if (!canEdit) return;
+    
+    const newObstacle = {
+      id: `obstacle-${Date.now()}`,
+      type: 'obstacle',
+      ...obstacleData
+    };
+    
+    addObstacle(newObstacle);
+    setShowObstacleForm(false);
+    showMessage('Obstacle ajouté avec succès');
+  }, [canEdit, addObstacle, showMessage]);
+
   const handleZoomIn = useCallback(() => {
     setZoom(prev => Math.min(prev + 0.2, 2));
     showMessage(`Zoom: ${Math.round((zoom + 0.2) * 100)}%`);
@@ -268,16 +295,58 @@ const FloorPlanManagement = () => {
     showMessage('Zoom réinitialisé à 100%');
   }, [showMessage]);
 
+  // ✅ NOUVELLES FONCTIONS POUR LES OBSTACLES
+  
+  const handleDuplicateObstacle = useCallback((obstacleId) => {
+    if (!canEdit) return;
+    
+    duplicateObstacle(obstacleId);
+    showMessage('Obstacle dupliqué avec succès');
+  }, [canEdit, duplicateObstacle, showMessage]);
+  
+  const handleObstacleContextMenu = useCallback((obstacleId, event) => {
+    event.preventDefault();
+    
+    // Pour l'instant, on sélectionne juste l'obstacle
+    // Dans une version future, on pourrait afficher un menu contextuel
+    const obstacle = getObstacleById(obstacleId);
+    if (obstacle) {
+      setSelectedItem(obstacle);
+      showMessage(`Obstacle "${obstacle.name || obstacle.category}" sélectionné`);
+    }
+  }, [getObstacleById, showMessage]);
+  
+  const handleObstacleQuickEdit = useCallback((obstacleId, property, value) => {
+    if (!canEdit) return;
+    
+    updateObstacle(obstacleId, { [property]: value });
+    showMessage(`${property} de l'obstacle mis à jour`);
+  }, [canEdit, updateObstacle, showMessage]);
+
   // Données mémorisées
   const planStats = useMemo(() => {
-    if (!currentFloorPlan) return { tables: 0, capacity: 0, obstacles: 0 };
+    if (!currentFloorPlan) return { tables: 0, capacity: 0, obstacles: 0, obstacleTypes: {} };
+    
+    // ✅ STATISTIQUES AMÉLIORÉES pour les obstacles
+    const obstacleTypes = obstacles.reduce((acc, obstacle) => {
+      const type = obstacle.category || obstacle.type || 'autre';
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {});
     
     return {
       tables: tables.length,
       capacity: currentCapacity,
-      obstacles: obstacles.length
+      obstacles: obstacles.length,
+      obstacleTypes,
+      // Ajouter des stats sur les formes
+      shapes: [...tables, ...obstacles].reduce((acc, item) => {
+        acc[item.shape] = (acc[item.shape] || 0) + 1;
+        return acc;
+      }, {}),
+      totalElements: tables.length + obstacles.length
     };
-  }, [currentFloorPlan, tables.length, currentCapacity, obstacles.length]);
+  }, [currentFloorPlan, tables.length, currentCapacity, obstacles]);
 
   const toolsConfig = useMemo(() => [
     { 
@@ -502,6 +571,16 @@ const FloorPlanManagement = () => {
                   </MenuItem>
                 )}
                 
+                {canEdit && (
+                  <MenuItem onClick={() => {
+                    setShowObstacleForm(true);
+                    handleMenuClose();
+                  }}>
+                    <ObstacleIcon sx={{ mr: 2 }} />
+                    Ajouter Obstacle Rapide
+                  </MenuItem>
+                )}
+                
                 <MenuItem onClick={() => {
                   handleAddObstacle();
                   handleMenuClose();
@@ -509,6 +588,16 @@ const FloorPlanManagement = () => {
                   <ObstacleIcon sx={{ mr: 2 }} />
                   Ajouter Obstacle
                 </MenuItem>
+                
+                {selectedItem?.type === 'obstacle' && canEdit && (
+                  <MenuItem onClick={() => {
+                    handleDuplicateObstacle(selectedItem.id);
+                    handleMenuClose();
+                  }}>
+                    <CopyIcon sx={{ mr: 2 }} />
+                    Dupliquer Obstacle
+                  </MenuItem>
+                )}
                 
                 <MenuItem onClick={() => {
                   setActiveTab(1);
@@ -576,6 +665,11 @@ const FloorPlanManagement = () => {
                         label={`${plan.tables?.length || 0} tables`}
                         size="small"
                         color={plan.id === currentFloorPlan?.id ? 'primary' : 'default'}
+                      />
+                      <Chip 
+                        label={`${plan.obstacles?.length || 0} obstacles`}
+                        size="small"
+                        color={plan.id === currentFloorPlan?.id ? 'warning' : 'default'}
                       />
                     </Box>
                   }
@@ -703,6 +797,16 @@ const FloorPlanManagement = () => {
                             variant="outlined"
                           />
                         )}
+                        {Object.keys(planStats.obstacleTypes).length > 0 && (
+                          <Tooltip title={`Types: ${Object.entries(planStats.obstacleTypes).map(([type, count]) => `${type} (${count})`).join(', ')}`}>
+                            <Chip
+                              label={`${Object.keys(planStats.obstacleTypes).length} types`}
+                              color="info"
+                              variant="outlined"
+                              size="small"
+                            />
+                          </Tooltip>
+                        )}
                       </Box>
                     </Box>
                   </Paper>
@@ -729,6 +833,11 @@ const FloorPlanManagement = () => {
                       height={600}
                       fixedSize={true}
                       zoom={zoom}
+                      obstaclesDraggable={true}
+                      onObstacleDragEnd={(obstacleId, position) => {
+                        updateObstacle(obstacleId, { x: position.x, y: position.y });
+                        showMessage('Position de l\'obstacle mise à jour');
+                      }}
                     />
                   </Paper>
                 </Grid>
@@ -754,6 +863,16 @@ const FloorPlanManagement = () => {
                           </Typography>
                           
                           <Box>
+                            {canEdit && selectedItem.type === 'obstacle' && (
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDuplicateObstacle(selectedItem.id)}
+                                color="primary"
+                                title="Dupliquer"
+                              >
+                                <CopyIcon />
+                              </IconButton>
+                            )}
                             {canEdit && (
                               <IconButton
                                 size="small"
@@ -895,7 +1014,7 @@ const FloorPlanManagement = () => {
                       <Typography variant="subtitle2" gutterBottom>
                         Statistiques du plan actuel
                       </Typography>
-                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
                         <Chip 
                           label={`${tables.length} tables`} 
                           size="small" 
@@ -917,6 +1036,35 @@ const FloorPlanManagement = () => {
                           color="info" 
                         />
                       </Box>
+                      
+                      {/* ✅ DÉTAIL DES TYPES D'OBSTACLES */}
+                      {Object.keys(planStats.obstacleTypes).length > 0 && (
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="body2" color="text.secondary" gutterBottom>
+                            Types d'obstacles :
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                            {Object.entries(planStats.obstacleTypes).map(([type, count]) => (
+                              <Chip 
+                                key={type}
+                                label={`${type}: ${count}`} 
+                                size="small" 
+                                variant="outlined"
+                                color="secondary"
+                              />
+                            ))}
+                          </Box>
+                        </Box>
+                      )}
+                      
+                      {/* ✅ INFORMATIONS SUPPLÉMENTAIRES */}
+                      <Typography variant="body2" color="text.secondary">
+                        Total d'éléments: {planStats.totalElements} | 
+                        Dernière modification: {currentFloorPlan.updatedAt ? 
+                          new Date(currentFloorPlan.updatedAt).toLocaleDateString() : 
+                          'Inconnue'
+                        }
+                      </Typography>
                     </Box>
                   )}
                 </Paper>
@@ -1048,6 +1196,43 @@ const FloorPlanManagement = () => {
           </DialogActions>
         </Dialog>
 
+        {/* ✅ NOUVEAU Dialog d'ajout rapide d'obstacle */}
+        <Dialog 
+          open={showObstacleForm} 
+          onClose={() => setShowObstacleForm(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>
+            Ajouter un obstacle rapidement
+          </DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 2 }}>
+              <ObstacleForm
+                onSubmit={handleQuickAddObstacle}
+                initialValues={{
+                  category: 'mur',
+                  name: `Mur ${obstacles.length + 1}`,
+                  shape: 'rectangle',
+                  color: '#8B4513',
+                  x: 100 + (obstacles.length * 30),
+                  y: 100 + (obstacles.length * 30),
+                  width: 150,
+                  height: 20,
+                  rotation: 0,
+                  description: ''
+                }}
+                isEdit={false}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowObstacleForm(false)}>
+              Annuler
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         {/* Dialog de confirmation de suppression */}
         <Dialog
           open={showDeleteDialog}
@@ -1058,6 +1243,11 @@ const FloorPlanManagement = () => {
             <Typography>
               Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.
             </Typography>
+            {selectedItem?.type === 'obstacle' && selectedItem.name && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Obstacle : <strong>{selectedItem.name}</strong> ({selectedItem.category})
+              </Typography>
+            )}
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setShowDeleteDialog(false)}>

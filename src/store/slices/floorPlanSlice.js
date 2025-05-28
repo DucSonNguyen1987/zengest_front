@@ -3,10 +3,9 @@ import { transformMockDataToFloorPlans } from '../../utils/mockDataTransformer.j
 
 const initialFloorPlans = transformMockDataToFloorPlans();
 
-
 const initialState = {
   floorPlans: initialFloorPlans,
-  currentFloorPlan: initialFloorPlans[0] || null, // Sélectionner la première salle par défaut
+  currentFloorPlan: initialFloorPlans[0] || null,
   loading: false,
   error: null
 };
@@ -93,7 +92,7 @@ const floorPlanSlice = createSlice({
       state.error = action.payload;
     },
 
-     // Nouvelle action pour réinitialiser avec les données mockées
+    // Nouvelle action pour réinitialiser avec les données mockées
     initializeMockData(state) {
       const mockFloorPlans = transformMockDataToFloorPlans();
       state.floorPlans = mockFloorPlans;
@@ -110,6 +109,8 @@ const floorPlanSlice = createSlice({
       }
     },
     
+    // ACTIONS POUR LES TABLES
+    
     // Ajouter une table au plan courant
     addTable(state, action) {
       if (state.currentFloorPlan) {
@@ -122,10 +123,16 @@ const floorPlanSlice = createSlice({
     
     // Mettre à jour une table
     updateTable(state, action) {
+      const { tableId, updates } = action.payload;
+      
       if (state.currentFloorPlan && state.currentFloorPlan.tables) {
-        const index = state.currentFloorPlan.tables.findIndex(table => table.id === action.payload.id);
-        if (index !== -1) {
-          state.currentFloorPlan.tables[index] = action.payload;
+        const tableIndex = state.currentFloorPlan.tables.findIndex(table => table.id === tableId);
+        
+        if (tableIndex !== -1) {
+          state.currentFloorPlan.tables[tableIndex] = {
+            ...state.currentFloorPlan.tables[tableIndex],
+            ...updates
+          };
         }
       }
     },
@@ -168,7 +175,7 @@ const floorPlanSlice = createSlice({
       }
     },
     
-    // Mettre à jour un obstacle (VERSION CORRIGÉE)
+    // ✅ NOUVELLE ACTION: Mettre à jour un obstacle complet
     updateObstacle(state, action) {
       const { obstacleId, updates } = action.payload;
       
@@ -181,7 +188,11 @@ const floorPlanSlice = createSlice({
           // Fusionner les modifications avec l'obstacle existant
           state.currentFloorPlan.obstacles[obstacleIndex] = {
             ...state.currentFloorPlan.obstacles[obstacleIndex],
-            ...updates
+            ...updates,
+            // S'assurer que l'ID reste inchangé
+            id: obstacleId,
+            // Ajouter la date de modification
+            updatedAt: new Date().toISOString()
           };
         }
       }
@@ -209,11 +220,63 @@ const floorPlanSlice = createSlice({
           state.currentFloorPlan.obstacles[obstacleIndex] = {
             ...state.currentFloorPlan.obstacles[obstacleIndex],
             x: position.x,
-            y: position.y
+            y: position.y,
+            updatedAt: new Date().toISOString()
           };
         }
       }
     },
+    
+    // ✅ NOUVELLE ACTION: Mettre à jour les propriétés spécifiques d'un obstacle
+    updateObstacleProperties(state, action) {
+      const { obstacleId, properties } = action.payload;
+      
+      if (state.currentFloorPlan && state.currentFloorPlan.obstacles) {
+        const obstacleIndex = state.currentFloorPlan.obstacles.findIndex(
+          obstacle => obstacle.id === obstacleId
+        );
+        
+        if (obstacleIndex !== -1) {
+          const obstacle = state.currentFloorPlan.obstacles[obstacleIndex];
+          
+          // Mettre à jour les propriétés spécifiées
+          Object.keys(properties).forEach(key => {
+            if (key !== 'id') { // Protéger l'ID
+              obstacle[key] = properties[key];
+            }
+          });
+          
+          obstacle.updatedAt = new Date().toISOString();
+        }
+      }
+    },
+    
+    // ✅ NOUVELLE ACTION: Dupliquer un obstacle
+    duplicateObstacle(state, action) {
+      const { obstacleId } = action.payload;
+      
+      if (state.currentFloorPlan && state.currentFloorPlan.obstacles) {
+        const originalObstacle = state.currentFloorPlan.obstacles.find(
+          obstacle => obstacle.id === obstacleId
+        );
+        
+        if (originalObstacle) {
+          const duplicatedObstacle = {
+            ...originalObstacle,
+            id: `obstacle-${Date.now()}-copy`,
+            x: originalObstacle.x + 20, // Décaler légèrement
+            y: originalObstacle.y + 20,
+            name: `${originalObstacle.name || 'Obstacle'} (copie)`,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          
+          state.currentFloorPlan.obstacles.push(duplicatedObstacle);
+        }
+      }
+    },
+    
+    // AUTRES ACTIONS
     
     // Définir le périmètre
     setPerimeter(state, action) {
@@ -242,8 +305,6 @@ const floorPlanSlice = createSlice({
     clearCurrentFloorPlan(state) {
       state.currentFloorPlan = null;
     },
-
-    
   }
 });
 
@@ -269,16 +330,18 @@ export const {
   updateTablePosition,
   setCurrentFloorPlan,
   clearCurrentFloorPlan,
-  // Actions pour les obstacles
+  // Actions exportées pour les obstacles - MISES À JOUR
   addObstacle,
   updateObstacle,
   removeObstacle,
   updateObstaclePosition,
+  updateObstacleProperties,
+  duplicateObstacle,
   setPerimeter,
   updateCapacityLimit,
-  //  Initialisation des Mock Datas
-   initializeMockData,
-   switchFloorPlan
+  // Initialisation des Mock Datas
+  initializeMockData,
+  switchFloorPlan
 } = floorPlanSlice.actions;
 
 export default floorPlanSlice.reducer;

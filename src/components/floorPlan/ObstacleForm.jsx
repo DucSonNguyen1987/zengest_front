@@ -12,7 +12,10 @@ import {
   Select,
   Slider,
   InputAdornment,
-  Chip
+  Chip,
+  Tooltip,
+  Divider,
+  Alert
 } from '@mui/material';
 import { alpha, useTheme } from '@mui/material/styles';
 import { ChromePicker } from 'react-color';
@@ -26,13 +29,67 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
   // État pour le sélecteur de couleur
   const [showColorPicker, setShowColorPicker] = React.useState(false);
   
+  // ✅ MISE À JOUR: Presets de couleurs étendus pour tous les types d'obstacles
+  const colorPresets = {
+    mur: '#8B4513',        // Marron pour les murs
+    poteau: '#696969',     // Gris pour les poteaux  
+    porte: '#DEB887',      // Beige pour les portes
+    escalier: '#4682B4',   // Bleu acier pour les escaliers
+    bar: '#2F4F4F',        // Gris ardoise pour le bar
+    cuisine: '#FF6347',    // Rouge tomate pour la cuisine
+    toilettes: '#87CEEB',   // Bleu ciel pour les toilettes
+    decoration: '#9370DB',  // Violet moyen pour la décoration
+    mobilier: '#CD853F',   // Brun pour le mobilier
+    technique: '#FF8C00',  // Orange pour l'équipement technique
+    autre: '#FF6384'       // Rose pour les autres
+  };
+  
+  // ✅ MISE À JOUR: Configurations par défaut selon le type
+  const getDefaultConfig = (category) => {
+    const configs = {
+      mur: { width: 150, height: 20, shape: 'rectangle' },
+      poteau: { width: 40, height: 40, shape: 'circle' },
+      porte: { width: 80, height: 15, shape: 'rectangle' },
+      escalier: { width: 120, height: 80, shape: 'rectangle' },
+      bar: { width: 200, height: 60, shape: 'rectangle' },
+      cuisine: { width: 100, height: 100, shape: 'rectangle' },
+      toilettes: { width: 80, height: 80, shape: 'rectangle' },
+      decoration: { width: 50, height: 50, shape: 'circle' },
+      mobilier: { width: 100, height: 60, shape: 'rectangle' },
+      technique: { width: 60, height: 60, shape: 'rectangle' },
+      autre: { width: 80, height: 30, shape: 'rectangle' }
+    };
+    
+    return configs[category] || configs.autre;
+  };
+  
+  // ✅ HELPER: Obtenir le nom d'affichage d'une catégorie
+  const getCategoryDisplayName = (category) => {
+    const displayNames = {
+      mur: 'Mur',
+      poteau: 'Poteau',
+      porte: 'Porte',
+      escalier: 'Escalier',
+      bar: 'Comptoir',
+      cuisine: 'Zone cuisine',
+      toilettes: 'Toilettes',
+      decoration: 'Décoration',
+      mobilier: 'Mobilier',
+      technique: 'Équipement',
+      autre: 'Obstacle'
+    };
+    
+    return displayNames[category] || 'Obstacle';
+  };
+  
   // État du formulaire
   const [formValues, setFormValues] = React.useState({
     category: 'mur',
+    name: '',
     shape: 'rectangle',
     width: 100,
     height: 30,
-    color: '#FF6384',
+    color: '#8B4513',
     x: 100,
     y: 100,
     rotation: 0,
@@ -45,10 +102,11 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
     if (initialValues) {
       setFormValues({
         category: 'mur',
+        name: '',
         shape: 'rectangle',
         width: 100,
         height: 30,
-        color: '#FF6384',
+        color: '#8B4513',
         x: 100,
         y: 100,
         rotation: 0,
@@ -94,24 +152,23 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
     }));
   };
   
-  // Presets de couleurs pour différents types d'obstacles
-  const colorPresets = {
-    mur: '#8B4513',
-    poteau: '#696969', 
-    bar: '#4A4A4A',
-    cuisine: '#FF6B6B',
-    decoration: '#9B59B6',
-    escalier: '#3498DB',
-    autre: '#FF6384'
-  };
-  
-  // Gérer le changement de catégorie
+  // ✅ MISE À JOUR: Gérer le changement de catégorie avec configuration automatique
   const handleCategoryChange = (event) => {
     const category = event.target.value;
+    const defaultConfig = getDefaultConfig(category);
+    
     setFormValues(prev => ({
       ...prev,
       category: category,
-      color: colorPresets[category] || prev.color
+      color: colorPresets[category] || prev.color,
+      // Appliquer la configuration par défaut seulement si c'est un nouvel obstacle
+      ...(isEdit ? {} : {
+        width: defaultConfig.width,
+        height: defaultConfig.height,
+        shape: defaultConfig.shape
+      }),
+      // Mettre à jour le nom si ce n'est pas défini
+      name: prev.name || getCategoryDisplayName(category)
     }));
   };
   
@@ -121,16 +178,26 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
     onSubmit({
       ...formValues,
       id: initialValues?.id || `obstacle-${Date.now()}`,
-      type: 'obstacle'
+      type: 'obstacle',
+      // S'assurer que le nom est défini
+      name: formValues.name || getCategoryDisplayName(formValues.category),
+      // Ajouter des métadonnées
+      createdAt: initialValues?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
     
+    // Réinitialiser le formulaire seulement si ce n'est pas une édition
     if (!isEdit) {
+      const defaultCategory = 'mur';
+      const defaultConfig = getDefaultConfig(defaultCategory);
+      
       setFormValues({
-        category: 'mur',
-        shape: 'rectangle',
-        width: 100,
-        height: 30,
-        color: '#FF6384',
+        category: defaultCategory,
+        name: '',
+        shape: defaultConfig.shape,
+        width: defaultConfig.width,
+        height: defaultConfig.height,
+        color: colorPresets[defaultCategory],
         x: 100,
         y: 100,
         rotation: 0,
@@ -161,6 +228,24 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
         {isEdit ? 'Modifier l\'obstacle' : 'Ajouter un obstacle'}
       </Typography>
       
+      {/* Aperçu de l'obstacle */}
+      {formValues.category && (
+        <Alert 
+          severity="info" 
+          sx={{ 
+            mb: 2,
+            backgroundColor: alpha(colorPresets[formValues.category], 0.1),
+            borderColor: alpha(colorPresets[formValues.category], 0.3)
+          }}
+        >
+          <Typography variant="body2">
+            <strong>Type:</strong> {getCategoryDisplayName(formValues.category)} | 
+            <strong> Forme:</strong> {formValues.shape === 'circle' ? 'Rond' : formValues.shape === 'triangle' ? 'Triangle' : 'Rectangle'} | 
+            <strong> Taille:</strong> {formValues.width}×{formValues.height}px
+          </Typography>
+        </Alert>
+      )}
+      
       <Box 
         component="form" 
         onSubmit={handleSubmit} 
@@ -185,35 +270,39 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
                 }
               }}
             >
-              <InputLabel id="category-label">Catégorie</InputLabel>
+              <InputLabel id="category-label">Type d'obstacle</InputLabel>
               <Select
                 labelId="category-label"
                 id="category"
                 name="category"
                 value={formValues.category}
                 onChange={handleCategoryChange}
-                label="Catégorie"
+                label="Type d'obstacle"
               >
-                <MenuItem value="mur">Mur</MenuItem>
-                <MenuItem value="poteau">Poteau</MenuItem>
-                <MenuItem value="bar">Comptoir</MenuItem>
-                <MenuItem value="cuisine">Zone cuisine</MenuItem>
-                <MenuItem value="decoration">Décoration</MenuItem>
-                <MenuItem value="escalier">Escalier</MenuItem>
-                <MenuItem value="autre">Autre</MenuItem>
+                <MenuItem value="mur">🧱 Mur</MenuItem>
+                <MenuItem value="poteau">🏛️ Poteau</MenuItem>
+                <MenuItem value="porte">🚪 Porte</MenuItem>
+                <MenuItem value="escalier">🪜 Escalier</MenuItem>
+                <MenuItem value="bar">🍺 Comptoir/Bar</MenuItem>
+                <MenuItem value="cuisine">👨‍🍳 Zone cuisine</MenuItem>
+                <MenuItem value="toilettes">🚻 Toilettes</MenuItem>
+                <MenuItem value="decoration">🌿 Décoration</MenuItem>
+                <MenuItem value="mobilier">🛋️ Mobilier fixe</MenuItem>
+                <MenuItem value="technique">⚡ Équipement technique</MenuItem>
+                <MenuItem value="autre">❓ Autre</MenuItem>
               </Select>
             </FormControl>
           </Grid>
           
-          {/* Description */}
+          {/* Nom/Label de l'obstacle */}
           <Grid item xs={12}>
             <TextField
               fullWidth
-              id="description"
-              name="description"
-              label="Description (optionnel)"
-              placeholder="Ex: Mur porteur, Colonne décorative..."
-              value={formValues.description}
+              id="name"
+              name="name"
+              label="Nom de l'obstacle"
+              placeholder="Ex: Mur principal, Poteau central..."
+              value={formValues.name || ''}
               onChange={handleChange}
               variant="outlined"
               InputProps={{
@@ -229,6 +318,42 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
                 }
               }}
             />
+          </Grid>
+          
+          {/* Description */}
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              id="description"
+              name="description"
+              label="Description (optionnel)"
+              placeholder="Ex: Mur porteur, Colonne décorative..."
+              value={formValues.description}
+              onChange={handleChange}
+              variant="outlined"
+              multiline
+              rows={2}
+              InputProps={{
+                sx: {
+                  backdropFilter: 'blur(4px)',
+                  backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.4 : 0.6),
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.5 : 0.7),
+                  },
+                  '&.Mui-focused': {
+                    backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.6 : 0.8),
+                  }
+                }
+              }}
+            />
+          </Grid>
+          
+          <Grid item xs={12}>
+            <Divider sx={{ my: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                Propriétés géométriques
+              </Typography>
+            </Divider>
           </Grid>
           
           {/* Forme */}
@@ -258,9 +383,9 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
                 onChange={handleChange}
                 label="Forme"
               >
-                <MenuItem value="rectangle">Rectangle</MenuItem>
-                <MenuItem value="circle">Rond</MenuItem>
-                <MenuItem value="triangle">Triangle</MenuItem>
+                <MenuItem value="rectangle">📐 Rectangle</MenuItem>
+                <MenuItem value="circle">⭕ Rond</MenuItem>
+                <MenuItem value="triangle">🔺 Triangle</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -279,14 +404,16 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
                   fullWidth
                   id="width"
                   name="width"
-                  label="Largeur"
+                  label={formValues.shape === 'circle' ? 'Diamètre' : 'Largeur'}
                   type="number"
                   value={formValues.width}
                   onChange={handleNumberChange('width')}
                   variant="outlined"
                   inputProps={{ min: 10, max: 500 }}
                   InputProps={{
-                    startAdornment: <InputAdornment position="start">L</InputAdornment>,
+                    startAdornment: <InputAdornment position="start">
+                      {formValues.shape === 'circle' ? '⌀' : 'L'}
+                    </InputAdornment>,
                     sx: {
                       backdropFilter: 'blur(4px)',
                       backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.4 : 0.6),
@@ -294,26 +421,28 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
                   }}
                 />
               </Grid>
-              <Grid item xs={6}>
-                <TextField
-                  fullWidth
-                  id="height"
-                  name="height"
-                  label="Hauteur"
-                  type="number"
-                  value={formValues.height}
-                  onChange={handleNumberChange('height')}
-                  variant="outlined"
-                  inputProps={{ min: 10, max: 500 }}
-                  InputProps={{
-                    startAdornment: <InputAdornment position="start">H</InputAdornment>,
-                    sx: {
-                      backdropFilter: 'blur(4px)',
-                      backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.4 : 0.6),
-                    }
-                  }}
-                />
-              </Grid>
+              {formValues.shape !== 'circle' && (
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    id="height"
+                    name="height"
+                    label="Hauteur"
+                    type="number"
+                    value={formValues.height}
+                    onChange={handleNumberChange('height')}
+                    variant="outlined"
+                    inputProps={{ min: 10, max: 500 }}
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start">H</InputAdornment>,
+                      sx: {
+                        backdropFilter: 'blur(4px)',
+                        backgroundColor: alpha(theme.palette.background.paper, isDark ? 0.4 : 0.6),
+                      }
+                    }}
+                  />
+                </Grid>
+              )}
             </Grid>
           </Grid>
           
@@ -382,6 +511,13 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
               aria-labelledby="rotation-slider"
               min={0}
               max={359}
+              step={5}
+              marks={[
+                { value: 0, label: '0°' },
+                { value: 90, label: '90°' },
+                { value: 180, label: '180°' },
+                { value: 270, label: '270°' }
+              ]}
               valueLabelDisplay="auto"
               valueLabelFormat={(value) => `${value}°`}
               sx={{
@@ -397,6 +533,14 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
             />
           </Grid>
           
+          <Grid item xs={12}>
+            <Divider sx={{ my: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                Apparence
+              </Typography>
+            </Divider>
+          </Grid>
+          
           {/* Couleur avec presets */}
           <Grid item xs={12}>
             <Typography 
@@ -409,22 +553,26 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
             {/* Presets de couleurs */}
             <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
               {Object.entries(colorPresets).map(([category, color]) => (
-                <Chip
-                  key={category}
-                  label={category}
-                  clickable
-                  size="small"
-                  sx={{
-                    backgroundColor: color,
-                    color: 'white',
-                    border: formValues.color === color ? '2px solid white' : 'none',
-                    '&:hover': {
+                <Tooltip key={category} title={getCategoryDisplayName(category)}>
+                  <Chip
+                    label={getCategoryDisplayName(category)}
+                    clickable
+                    size="small"
+                    sx={{
                       backgroundColor: color,
-                      opacity: 0.8,
-                    }
-                  }}
-                  onClick={() => setFormValues(prev => ({ ...prev, color }))}
-                />
+                      color: 'white',
+                      border: formValues.color === color ? '2px solid white' : 'none',
+                      boxShadow: formValues.color === color ? `0 0 0 2px ${color}` : 'none',
+                      '&:hover': {
+                        backgroundColor: color,
+                        opacity: 0.8,
+                        transform: 'scale(1.05)',
+                      },
+                      transition: 'all 0.2s'
+                    }}
+                    onClick={() => setFormValues(prev => ({ ...prev, color }))}
+                  />
+                </Tooltip>
               ))}
             </Box>
             
@@ -439,11 +587,26 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
                 borderRadius: 1,
                 border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
                 transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 '&:hover': {
                   boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.2)}`,
+                  transform: 'scale(1.02)',
                 }
               }}
-            />
+            >
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: 'white', 
+                  textShadow: '1px 1px 2px rgba(0,0,0,0.5)',
+                  fontWeight: 'medium'
+                }}
+              >
+                Cliquer pour personnaliser la couleur
+              </Typography>
+            </Box>
             
             {showColorPicker && (
               <Box 
@@ -493,7 +656,9 @@ const ObstacleForm = ({ onSubmit, initialValues, isEdit = false }) => {
               boxShadow: isDark 
                 ? `0 6px 20px ${alpha(theme.palette.primary.main, 0.6)}`
                 : `0 6px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
-            }
+              transform: 'translateY(-2px)',
+            },
+            transition: 'all 0.3s ease'
           }}
         >
           {isEdit ? 'Mettre à jour l\'obstacle' : 'Ajouter l\'obstacle'}
