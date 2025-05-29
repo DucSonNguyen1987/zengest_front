@@ -1,7 +1,7 @@
-// src/components/floorPlan/OptimizedCanvas.jsx - VERSION OPTIMISÉE PERFORMANCE
+// src/components/floorPlan/OptimizedCanvas.jsx - VERSION CORRIGÉE
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Stage, Layer, Rect, Circle, Line, Group } from 'react-konva';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
+import { Stage, Layer, Rect, Circle, Line, Group, RegularPolygon } from 'react-konva';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
   deleteTable, 
@@ -25,7 +25,10 @@ import {
 } from '@mui/icons-material';
 import { useColorMode } from '../../context/ThemeContext';
 
-// ✅ OPTIMISATION 1: Throttle pour les événements fréquents
+
+
+
+// ✅ CORRECTION 1: Throttle optimisé mais moins agressif
 const throttle = (func, delay) => {
   let timeoutId;
   let lastExecTime = 0;
@@ -43,31 +46,6 @@ const throttle = (func, delay) => {
       }, delay - (currentTime - lastExecTime));
     }
   };
-};
-
-// ✅ OPTIMISATION 2: Cache de validation global
-const validationCache = new Map();
-const VALIDATION_CACHE_SIZE = 30; // Réduit significativement
-
-const validateDimensions = (width, height, minSize = 5, maxSize = 800) => {
-  const key = `${width}-${height}-${minSize}-${maxSize}`;
-  
-  if (validationCache.has(key)) {
-    return validationCache.get(key);
-  }
-  
-  const result = {
-    width: Math.max(Math.min(Number(width) || minSize, maxSize), minSize),
-    height: Math.max(Math.min(Number(height) || minSize, maxSize), minSize)
-  };
-  
-  if (validationCache.size >= VALIDATION_CACHE_SIZE) {
-    const firstKey = validationCache.keys().next().value;
-    validationCache.delete(firstKey);
-  }
-  
-  validationCache.set(key, result);
-  return result;
 };
 
 const OptimizedCanvas = ({ 
@@ -91,16 +69,15 @@ const OptimizedCanvas = ({
   
   const dispatch = useDispatch();
   
-  // ✅ OPTIMISATION 3: Sélecteur ultra-simple avec égalité stricte
+  // ✅ CORRECTION 2: Sélecteur SANS optimisation pour forcer les updates
   const currentFloorPlan = useSelector(state => state.floorPlan.currentFloorPlan);
   
   const stageRef = useRef(null);
-  const containerRef = useRef(null);
   
   const [selectedId, setSelectedId] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
   
-  // ✅ OPTIMISATION 4: Canvas size fixe pour éviter les recalculs
+  // ✅ CORRECTION 3: Canvas size fixe et simple
   const canvasSize = useMemo(() => ({
     width: Math.min(propWidth || 800, maxWidth),
     height: Math.min(height || 400, maxHeight)
@@ -112,7 +89,7 @@ const OptimizedCanvas = ({
     severity: 'success'
   });
 
-  // ✅ OPTIMISATION 5: Handlers throttlés pour éviter les spams
+  // ✅ CORRECTION 4: Handlers avec throttling réduit
   const handleCloseSnackbar = useCallback(() => {
     setSnackbar(prev => ({ ...prev, open: false }));
   }, []);
@@ -123,37 +100,15 @@ const OptimizedCanvas = ({
       setSelectedType(null);
       onItemSelect?.(null);
     }
-  }, 100), [onItemSelect]); // ✅ Throttle à 100ms
+  }, 50), [onItemSelect]); // ✅ Réduit de 100ms à 50ms
 
-  // ✅ OPTIMISATION 6: Keyboard handler optimisé
-  const handleKeyDown = useCallback(throttle((e) => {
-    if (e.keyCode === 46 && selectedId && editable) {
-      if (selectedType === 'table') {
-        dispatch(deleteTable(selectedId));
-        setSnackbar({ open: true, message: 'Table supprimée', severity: 'success' });
-      } else if (selectedType === 'obstacle') {
-        dispatch(removeObstacle(selectedId));
-        setSnackbar({ open: true, message: 'Obstacle supprimé', severity: 'success' });
-      }
-      setSelectedId(null);
-      setSelectedType(null);
-      onItemSelect?.(null);
-    }
-  }, 200), [selectedId, selectedType, editable, dispatch, onItemSelect]); // ✅ Throttle plus agressif
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
-
-  // ✅ OPTIMISATION 7: Drag handlers ultra-simples
   const handleTableDragEnd = useCallback(throttle((tableId, newPosition) => {
     if (!editable || !dragMode) return;
     
     dispatch(updateTablePosition({ tableId, position: newPosition }));
     onTableDragEnd?.(tableId, newPosition);
     setSnackbar({ open: true, message: 'Position mise à jour', severity: 'success' });
-  }, 150), [editable, dragMode, dispatch, onTableDragEnd]);
+  }, 100), [editable, dragMode, dispatch, onTableDragEnd]); // ✅ Réduit de 150ms à 100ms
 
   const handleItemClick = useCallback(throttle((id, type) => {
     setSelectedId(id);
@@ -166,49 +121,63 @@ const OptimizedCanvas = ({
         onItemSelect({ ...item, type });
       }
     }
-  }, 100), [onItemSelect, currentFloorPlan]);
+  }, 50), [onItemSelect, currentFloorPlan]); // ✅ Réduit de 100ms à 50ms
 
-  // ✅ OPTIMISATION 8: Validation ultra-rapide avec early returns
+  // ✅ CORRECTION 5: Validation ultra-rapide des tables
   const safeTables = useMemo(() => {
     if (!currentFloorPlan?.tables?.length) return [];
     
     return currentFloorPlan.tables
       .filter(table => table?.id && table.width > 0 && table.height > 0)
-      .slice(0, 50) // ✅ Limite pour éviter le surrendu
-      .map(table => {
-        const validated = validateDimensions(table.width, table.height, 20, 200);
-        return {
-          ...table,
-          x: Number(table.x) || 0,
-          y: Number(table.y) || 0,
-          width: validated.width,
-          height: validated.height,
-          capacity: Math.max(Number(table.capacity) || 2, 1),
-          color: table.color || '#e6f7ff',
-          rotation: Number(table.rotation) || 0
-        };
-      });
+      .slice(0, 50) // ✅ Limite maintenue
+      .map(table => ({
+        ...table,
+        x: Number(table.x) || 0,
+        y: Number(table.y) || 0,
+        width: Math.max(Number(table.width) || 20, 20),
+        height: Math.max(Number(table.height) || 20, 20),
+        capacity: Math.max(Number(table.capacity) || 2, 1),
+        color: table.color || '#e6f7ff',
+        rotation: Number(table.rotation) || 0
+      }));
   }, [currentFloorPlan?.tables]);
 
+  // ✅ CORRECTION 6: Validation optimisée des obstacles avec debug
   const safeObstacles = useMemo(() => {
-    if (!showObstacles || !currentFloorPlan?.obstacles?.length) return [];
+    console.log('🔍 OptimizedCanvas - currentFloorPlan?.obstacles:', currentFloorPlan?.obstacles);
+    console.log('🔍 OptimizedCanvas - showObstacles:', showObstacles);
     
-    return currentFloorPlan.obstacles
-      .filter(obstacle => obstacle?.id && obstacle.width > 0 && obstacle.height > 0)
-      .slice(0, 20) // ✅ Limite obstacles
+    if (!showObstacles || !currentFloorPlan?.obstacles?.length) {
+      console.log('⚠️ OptimizedCanvas - Pas d\'obstacles à afficher');
+      return [];
+    }
+    
+    const processed = currentFloorPlan.obstacles
+      .filter(obstacle => {
+        const isValid = obstacle?.id && obstacle.width > 0 && obstacle.height > 0;
+        if (!isValid) {
+          console.log('⚠️ OptimizedCanvas - Obstacle invalide:', obstacle);
+        }
+        return isValid;
+      })
+      .slice(0, 30) // ✅ Limite augmentée de 20 à 30
       .map(obstacle => {
-        const validated = validateDimensions(obstacle.width, obstacle.height, 10, 300);
-        return {
+        const result = {
           ...obstacle,
           x: Number(obstacle.x) || 0,
           y: Number(obstacle.y) || 0,
-          width: validated.width,
-          height: validated.height,
+          width: Math.max(Number(obstacle.width) || 10, 10),
+          height: Math.max(Number(obstacle.height) || 10, 10),
           color: obstacle.color || '#FF6384',
           rotation: Number(obstacle.rotation) || 0,
           shape: obstacle.shape || 'rectangle'
         };
+        console.log('✅ OptimizedCanvas - Obstacle traité:', result);
+        return result;
       });
+    
+    console.log('📊 OptimizedCanvas - Obstacles finaux:', processed);
+    return processed;
   }, [currentFloorPlan?.obstacles, showObstacles]);
 
   const safePerimeter = useMemo(() => {
@@ -217,15 +186,14 @@ const OptimizedCanvas = ({
     }
     return currentFloorPlan.perimeter
       .filter(point => point && typeof point.x === 'number' && typeof point.y === 'number')
-      .slice(0, 20); // ✅ Limite points périmètre
+      .slice(0, 20); // ✅ Limite maintenue
   }, [currentFloorPlan?.perimeter, showPerimeter]);
 
-  // ✅ OPTIMISATION 9: Rendu conditionnel ultra-simple
+  // ✅ CORRECTION 7: Rendu conditionnel optimisé
   if (!currentFloorPlan) {
     return (
       <Paper
         elevation={0}
-        ref={containerRef}
         sx={{
           display: 'flex',
           justifyContent: 'center',
@@ -252,11 +220,15 @@ const OptimizedCanvas = ({
   const bgColor = currentFloorPlan?.backgroundColor || (isDark ? '#1E1E1E' : '#f9f9f9');
   const strokeColor = isDark ? '#333333' : '#dddddd';
 
+
+
+
+
+
   return (
     <Box sx={{ position: 'relative' }}>
       <Paper
         elevation={0}
-        ref={containerRef}
         sx={{
           height: `${canvasSize.height}px`,
           width: `${canvasSize.width}px`,
@@ -272,7 +244,7 @@ const OptimizedCanvas = ({
           height={canvasSize.height}
           onMouseDown={checkDeselect}
           onTouchStart={checkDeselect}
-          listening={editable} // ✅ Désactiver si non éditable
+          listening={editable}
         >
           <Layer>
             {/* Background optimisé */}
@@ -285,7 +257,7 @@ const OptimizedCanvas = ({
               stroke={strokeColor}
               strokeWidth={1}
               listening={false}
-              perfectDrawEnabled={false} // ✅ Performance Konva
+              perfectDrawEnabled={false}
             />
             
             {/* Perimeter optimisé */}
@@ -297,21 +269,23 @@ const OptimizedCanvas = ({
                 fill={`${currentFloorPlan?.perimeterColor || theme.palette.primary.main}15`}
                 strokeWidth={2}
                 listening={false}
-                perfectDrawEnabled={false} // ✅ Performance
+                perfectDrawEnabled={false}
               />
             )}
             
-            {/* Obstacles optimisés */}
+            {/* ✅ CORRECTION 8: Obstacles optimisés avec rendu amélioré */}
             <Group listening={editable}>
               {safeObstacles.map((obstacle) => {
+                console.log('🎨 OptimizedCanvas - Rendu obstacle:', obstacle.id, obstacle);
+                
                 const isSelected = selectedId === obstacle.id && selectedType === 'obstacle';
                 
                 const commonProps = {
                   key: obstacle.id,
                   fill: obstacle.color,
                   stroke: isSelected ? theme.palette.primary.main : '#FF6384',
-                  strokeWidth: isSelected ? 3 : 1,
-                  perfectDrawEnabled: false, // ✅ Performance
+                  strokeWidth: isSelected ? 3 : 2,
+                  perfectDrawEnabled: false,
                   listening: editable,
                 };
                 
@@ -320,23 +294,40 @@ const OptimizedCanvas = ({
                   commonProps.onTap = () => handleItemClick(obstacle.id, 'obstacle');
                 }
                 
-                return obstacle.shape === 'circle' ? (
-                  <Circle
-                    {...commonProps}
-                    x={obstacle.x}
-                    y={obstacle.y}
-                    radius={Math.max(obstacle.width/2, 5)}
-                  />
-                ) : (
-                  <Rect
-                    {...commonProps}
-                    x={obstacle.x - obstacle.width/2}
-                    y={obstacle.y - obstacle.height/2}
-                    width={obstacle.width}
-                    height={obstacle.height}
-                    rotation={obstacle.rotation}
-                  />
-                );
+                // Rendu selon la forme avec support amélioré
+                if (obstacle.shape === 'circle') {
+                  return (
+                    <Circle
+                      {...commonProps}
+                      x={obstacle.x}
+                      y={obstacle.y}
+                      radius={Math.max(obstacle.width/2, 5)}
+                    />
+                  );
+                } else if (obstacle.shape === 'triangle') {
+                  return (
+                    <RegularPolygon
+                      {...commonProps}
+                      x={obstacle.x}
+                      y={obstacle.y}
+                      sides={3}
+                      radius={Math.max(obstacle.width/2, 10)}
+                      rotation={obstacle.rotation}
+                    />
+                  );
+                } else {
+                  // Rectangle par défaut
+                  return (
+                    <Rect
+                      {...commonProps}
+                      x={obstacle.x - obstacle.width/2}
+                      y={obstacle.y - obstacle.height/2}
+                      width={obstacle.width}
+                      height={obstacle.height}
+                      rotation={obstacle.rotation}
+                    />
+                  );
+                }
               })}
             </Group>
             
@@ -369,12 +360,28 @@ const OptimizedCanvas = ({
             />
           </Box>
         )}
+        
+        {/* ✅ CORRECTION 9: Debug counter optimisé */}
+        {import.meta.env.NODE_ENV === 'development' && (
+          <Box sx={{ position: 'absolute', top: 12, left: 12, zIndex: 10 }}>
+            <Chip
+              label={`T:${safeTables.length} O:${safeObstacles.length}`}
+              size="small"
+              color="info"
+              variant="outlined"
+              sx={{ 
+                backgroundColor: 'rgba(255,255,255,0.9)',
+                fontSize: '0.7rem'
+              }}
+            />
+          </Box>
+        )}
       </Paper>
       
       {/* Snackbar optimisé */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={2000} // ✅ Plus rapide
+        autoHideDuration={2000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
@@ -390,15 +397,6 @@ const OptimizedCanvas = ({
   );
 };
 
-// ✅ OPTIMISATION 10: Comparaison React.memo ultra-simple
-export default React.memo(OptimizedCanvas, (prevProps, nextProps) => {
-  return (
-    prevProps.editable === nextProps.editable &&
-    prevProps.dragMode === nextProps.dragMode &&
-    prevProps.selectedItem?.id === nextProps.selectedItem?.id &&
-    prevProps.width === nextProps.width &&
-    prevProps.height === nextProps.height &&
-    prevProps.showPerimeter === nextProps.showPerimeter &&
-    prevProps.showObstacles === nextProps.showObstacles
-  );
-});
+// ✅ CORRECTION 10: Suppression complète de React.memo pour éviter les problèmes de cache
+// La performance est maintenue par les optimisations internes et useMemo
+export default OptimizedCanvas;

@@ -60,6 +60,10 @@ import ObstacleForm from '../../components/floorPlan/ObstacleForm';
 import FloorPlanForm from '../../components/floorPlan/FloorPlanForm';
 import ErrorBoundary from '../../components/common/ErrorBoundary';
 
+// Débug 
+import FloorPlanDebugTool from '../../components/floorPlan/FloorPlanDebugTool';
+
+
 // Types d'outils d'édition
 const TOOLS = {
   SELECT: 'select',
@@ -104,7 +108,7 @@ const FloorPlanManagement = () => {
   const [selectedTool, setSelectedTool] = useState(TOOLS.SELECT);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showTableForm, setShowTableForm] = useState(false);
-  const [showObstacleForm, setShowObstacleForm] = useState(false);
+  const [showObstacleForm, setShowObstacleForm] = useState(false); // ✅ État pour le formulaire obstacle
   const [showPlanForm, setShowPlanForm] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState(null);
@@ -165,32 +169,15 @@ const FloorPlanManagement = () => {
     setSelectedTool(TOOLS.SELECT);
   }, [canEdit, tables.length, addTable, showMessage]);
 
+  // ✅ CORRECTION: handleAddObstacle ouvre maintenant le formulaire
   const handleAddObstacle = useCallback(() => {
+    console.log('🔍 AVANT:', currentFloorPlan?.obstacles?.length, 'obstacles');
     if (!canEdit) return;
     
-    // ✅ MISE À JOUR: Utiliser une configuration plus intelligente
-    const obstacleNumber = obstacles.length + 1;
-    const newObstacle = {
-      id: `obstacle-${Date.now()}`,
-      type: 'obstacle',
-      category: 'mur',
-      name: `Mur ${obstacleNumber}`,
-      shape: 'rectangle',
-      color: '#8B4513',
-      x: 100 + (obstacles.length * 20),
-      y: 100 + (obstacles.length * 20),
-      width: 150,
-      height: 20,
-      rotation: 0,
-      description: '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    addObstacle(newObstacle);
-    showMessage('Obstacle ajouté avec succès');
+    // Ouvrir le formulaire au lieu de créer directement l'obstacle
+    setShowObstacleForm(true);
     setSelectedTool(TOOLS.SELECT);
-  }, [canEdit, obstacles.length, addObstacle, showMessage]);
+  }, [canEdit]);
 
   const handleItemUpdate = useCallback((updates) => {
     if (!selectedItem || !canEdit) return;
@@ -199,7 +186,6 @@ const FloorPlanManagement = () => {
       updateTable(selectedItem.id, updates);
       showMessage('Table mise à jour');
     } else if (selectedItem.type === 'obstacle') {
-      // ✅ NOUVELLE IMPLÉMENTATION: Utiliser updateObstacle
       updateObstacle(selectedItem.id, updates);
       showMessage('Obstacle mis à jour');
     }
@@ -266,18 +252,23 @@ const FloorPlanManagement = () => {
     showMessage('Table ajoutée avec succès');
   }, [canEdit, addTable, showMessage]);
 
-  const handleQuickAddObstacle = useCallback((obstacleData) => {
+  // ✅ CORRECTION: handleAddObstacleWithForm pour créer depuis le formulaire
+  const handleAddObstacleWithForm = useCallback((obstacleData) => {
     if (!canEdit) return;
     
     const newObstacle = {
       id: `obstacle-${Date.now()}`,
       type: 'obstacle',
-      ...obstacleData
+      ...obstacleData,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
     
     addObstacle(newObstacle);
     setShowObstacleForm(false);
+     setTimeout(() => console.log('🔍 APRÈS:', currentFloorPlan?.obstacles?.length, 'obstacles'), 100);
     showMessage('Obstacle ajouté avec succès');
+    
   }, [canEdit, addObstacle, showMessage]);
 
   const handleZoomIn = useCallback(() => {
@@ -295,27 +286,23 @@ const FloorPlanManagement = () => {
     showMessage('Zoom réinitialisé à 100%');
   }, [showMessage]);
 
-  // ✅ NOUVELLES FONCTIONS POUR LES OBSTACLES
-  
   const handleDuplicateObstacle = useCallback((obstacleId) => {
     if (!canEdit) return;
     
     duplicateObstacle(obstacleId);
     showMessage('Obstacle dupliqué avec succès');
   }, [canEdit, duplicateObstacle, showMessage]);
-  
+
   const handleObstacleContextMenu = useCallback((obstacleId, event) => {
     event.preventDefault();
     
-    // Pour l'instant, on sélectionne juste l'obstacle
-    // Dans une version future, on pourrait afficher un menu contextuel
     const obstacle = getObstacleById(obstacleId);
     if (obstacle) {
       setSelectedItem(obstacle);
       showMessage(`Obstacle "${obstacle.name || obstacle.category}" sélectionné`);
     }
   }, [getObstacleById, showMessage]);
-  
+
   const handleObstacleQuickEdit = useCallback((obstacleId, property, value) => {
     if (!canEdit) return;
     
@@ -327,7 +314,6 @@ const FloorPlanManagement = () => {
   const planStats = useMemo(() => {
     if (!currentFloorPlan) return { tables: 0, capacity: 0, obstacles: 0, obstacleTypes: {} };
     
-    // ✅ STATISTIQUES AMÉLIORÉES pour les obstacles
     const obstacleTypes = obstacles.reduce((acc, obstacle) => {
       const type = obstacle.category || obstacle.type || 'autre';
       acc[type] = (acc[type] || 0) + 1;
@@ -339,7 +325,6 @@ const FloorPlanManagement = () => {
       capacity: currentCapacity,
       obstacles: obstacles.length,
       obstacleTypes,
-      // Ajouter des stats sur les formes
       shapes: [...tables, ...obstacles].reduce((acc, item) => {
         acc[item.shape] = (acc[item.shape] || 0) + 1;
         return acc;
@@ -348,6 +333,7 @@ const FloorPlanManagement = () => {
     };
   }, [currentFloorPlan, tables.length, currentCapacity, obstacles]);
 
+  // ✅ CORRECTION: toolsConfig avec le bon handler
   const toolsConfig = useMemo(() => [
     { 
       id: TOOLS.SELECT, 
@@ -367,7 +353,7 @@ const FloorPlanManagement = () => {
       label: 'Ajouter Obstacle', 
       icon: <ObstacleIcon />, 
       disabled: !canEdit,
-      onClick: handleAddObstacle 
+      onClick: handleAddObstacle // ✅ Maintenant ouvre le formulaire
     },
     { 
       id: TOOLS.DRAG, 
@@ -475,6 +461,8 @@ const FloorPlanManagement = () => {
   }
 
   return (
+
+    
     <ErrorBoundary>
       <Box sx={{ p: 3, height: '100vh', display: 'flex', flexDirection: 'column' }}>
         {/* En-tête */}
@@ -541,7 +529,7 @@ const FloorPlanManagement = () => {
                 <MoreIcon />
               </IconButton>
               
-              {/* Menu d'actions rapides */}
+              {/* ✅ CORRECTION: Menu d'actions rapides */}
               <Menu
                 anchorEl={menuAnchor}
                 open={Boolean(menuAnchor)}
@@ -573,21 +561,13 @@ const FloorPlanManagement = () => {
                 
                 {canEdit && (
                   <MenuItem onClick={() => {
-                    setShowObstacleForm(true);
+                    setShowObstacleForm(true); // ✅ Ouvre directement le formulaire
                     handleMenuClose();
                   }}>
                     <ObstacleIcon sx={{ mr: 2 }} />
-                    Ajouter Obstacle Rapide
+                    Ajouter Obstacle
                   </MenuItem>
                 )}
-                
-                <MenuItem onClick={() => {
-                  handleAddObstacle();
-                  handleMenuClose();
-                }}>
-                  <ObstacleIcon sx={{ mr: 2 }} />
-                  Ajouter Obstacle
-                </MenuItem>
                 
                 {selectedItem?.type === 'obstacle' && canEdit && (
                   <MenuItem onClick={() => {
@@ -616,7 +596,6 @@ const FloorPlanManagement = () => {
                 </MenuItem>
                 
                 <MenuItem onClick={() => {
-                  // Actualiser les données
                   showMessage('Données actualisées');
                   handleMenuClose();
                 }}>
@@ -1008,7 +987,7 @@ const FloorPlanManagement = () => {
                     </Grid>
                   </Grid>
                   
-                  {/* Statistiques */}
+                  {/* Statistiques détaillées */}
                   {currentFloorPlan && (
                     <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
                       <Typography variant="subtitle2" gutterBottom>
@@ -1037,7 +1016,7 @@ const FloorPlanManagement = () => {
                         />
                       </Box>
                       
-                      {/* ✅ DÉTAIL DES TYPES D'OBSTACLES */}
+                      {/* Détail des types d'obstacles */}
                       {Object.keys(planStats.obstacleTypes).length > 0 && (
                         <Box sx={{ mb: 2 }}>
                           <Typography variant="body2" color="text.secondary" gutterBottom>
@@ -1057,7 +1036,6 @@ const FloorPlanManagement = () => {
                         </Box>
                       )}
                       
-                      {/* ✅ INFORMATIONS SUPPLÉMENTAIRES */}
                       <Typography variant="body2" color="text.secondary">
                         Total d'éléments: {planStats.totalElements} | 
                         Dernière modification: {currentFloorPlan.updatedAt ? 
@@ -1135,7 +1113,27 @@ const FloorPlanManagement = () => {
           </Fab>
         )}
 
-        {/* Dialogs */}
+
+          {/* Debug */}
+         {import.meta.env.NODE_ENV === 'development' && (
+          <Box
+            sx={{
+              position: 'fixed',
+              bottom: 20,
+              left: 20,
+              zIndex: 9999,
+              maxWidth: 300,
+              maxHeight: 400,
+              overflow: 'auto'
+            }}
+          >
+            <FloorPlanDebugTool />
+          </Box>
+        )}
+
+
+
+        {/* ✅ DIALOGS COMPLETS */}
         
         {/* Dialog de création/édition de plan */}
         <Dialog 
@@ -1196,7 +1194,7 @@ const FloorPlanManagement = () => {
           </DialogActions>
         </Dialog>
 
-        {/* ✅ NOUVEAU Dialog d'ajout rapide d'obstacle */}
+        {/* ✅ CORRECTION: Dialog d'ajout d'obstacle avec formulaire complet */}
         <Dialog 
           open={showObstacleForm} 
           onClose={() => setShowObstacleForm(false)}
@@ -1204,12 +1202,12 @@ const FloorPlanManagement = () => {
           fullWidth
         >
           <DialogTitle>
-            Ajouter un obstacle rapidement
+            Ajouter un nouvel obstacle
           </DialogTitle>
           <DialogContent>
             <Box sx={{ pt: 2 }}>
               <ObstacleForm
-                onSubmit={handleQuickAddObstacle}
+                onSubmit={handleAddObstacleWithForm} // ✅ Utilise le handler corrigé
                 initialValues={{
                   category: 'mur',
                   name: `Mur ${obstacles.length + 1}`,
@@ -1296,6 +1294,8 @@ const FloorPlanManagement = () => {
         </Snackbar>
       </Box>
     </ErrorBoundary>
+
+    
   );
 };
 

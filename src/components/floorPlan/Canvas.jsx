@@ -1,56 +1,29 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Stage, Layer, Rect, Circle, Line, Group, RegularPolygon } from 'react-konva';
 import { useDispatch, useSelector } from 'react-redux';
-import { 
-  deleteTable, 
+import {
+  deleteTable,
   updateTablePosition,
   updateObstaclePosition,
   removeObstacle
 } from '../../store/slices/floorPlanSlice';
 import TableShape from './TableShape';
-import { 
-  Box, 
-  Paper, 
-  Typography, 
-  Snackbar, 
+import {
+  Box,
+  Paper,
+  Typography,
+  Snackbar,
   Alert,
   Chip
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { 
+import {
   TableRestaurant as TableRestaurantIcon,
   DragIndicator as DragIndicatorIcon
 } from '@mui/icons-material';
 import { useColorMode } from '../../context/ThemeContext';
 
-// ✅ OPTIMISATION: Cache global pour éviter les recalculs
-const VALIDATION_CACHE = new Map();
-const VALIDATION_CACHE_MAX_SIZE = 50; // Réduit de 100 à 50
-
-// ✅ OPTIMISATION: Fonction de validation ultra-rapide
-const validateDimensions = (width, height, minSize = 5, maxSize = 1000) => {
-  const key = `${width}-${height}`;
-  
-  if (VALIDATION_CACHE.has(key)) {
-    return VALIDATION_CACHE.get(key);
-  }
-  
-  const result = {
-    width: Math.max(Math.min(Number(width) || minSize, maxSize), minSize),
-    height: Math.max(Math.min(Number(height) || minSize, maxSize), minSize)
-  };
-  
-  // Nettoyer le cache si nécessaire
-  if (VALIDATION_CACHE.size >= VALIDATION_CACHE_MAX_SIZE) {
-    const firstKey = VALIDATION_CACHE.keys().next().value;
-    VALIDATION_CACHE.delete(firstKey);
-  }
-  
-  VALIDATION_CACHE.set(key, result);
-  return result;
-};
-
-// ✅ OPTIMISATION: Debounce plus agressif
+// ✅ CORRECTION 1: Debounce optimisé
 const debounce = (func, wait) => {
   let timeout;
   return function executedFunction(...args) {
@@ -59,9 +32,9 @@ const debounce = (func, wait) => {
   };
 };
 
-const Canvas = ({ 
-  editable = true, 
-  height = 400, 
+const Canvas = ({
+  editable = true,
+  height = 400,
   dragMode = false,
   onTableDragEnd,
   showPerimeter = true,
@@ -72,33 +45,31 @@ const Canvas = ({
   onObstacleDragEnd: propOnObstacleDragEnd,
   obstaclesDraggable = false,
   fixedSize = false,
-  maxWidth = 800, // Réduit de 1000 à 800
+  maxWidth = 800,
   maxHeight = 600
 }) => {
   const theme = useTheme();
   const { mode } = useColorMode();
   const isDark = mode === 'dark';
-  
+
   const dispatch = useDispatch();
-  
-  // ✅ OPTIMISATION: Sélecteur optimisé avec shallowEqual
-  const currentFloorPlan = useSelector(state => state.floorPlan.currentFloorPlan, 
-    (left, right) => left?.id === right?.id && left?.tables?.length === right?.tables?.length
-  );
-  
+
+  // ✅ CORRECTION 2: Sélecteur sans shallowEqual pour forcer le re-render
+  const currentFloorPlan = useSelector(state => state.floorPlan.currentFloorPlan);
+
   const stageRef = useRef(null);
   const containerRef = useRef(null);
   const resizeTimeoutRef = useRef(null);
-  
+
   const [selectedId, setSelectedId] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
-  
-  // ✅ OPTIMISATION: État simplifié avec valeurs par défaut stables
+
+  // ✅ CORRECTION 3: Canvas size avec valeurs stables
   const [canvasSize, setCanvasSize] = useState(() => ({
     width: Math.min(propWidth, maxWidth),
     height: Math.min(height, maxHeight)
   }));
-  
+
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -109,60 +80,57 @@ const Canvas = ({
     setSnackbar(prev => ({ ...prev, open: false }));
   }, []);
 
-  // ✅ OPTIMISATION: Resize handler ultra-optimisé
+  // Gestion du resize
   const updateCanvasSize = useCallback(
     debounce(() => {
       if (fixedSize || !containerRef.current) return;
-      
+
       const containerWidth = containerRef.current.offsetWidth;
       const containerHeight = containerRef.current.offsetHeight;
-      
+
       if (containerWidth < 100 || containerHeight < 100) return;
-      
+
       const newWidth = Math.min(containerWidth, maxWidth);
       const newHeight = Math.min(containerHeight, maxHeight);
-      
+
       setCanvasSize(prevSize => {
-        // Éviter les updates inutiles
-        if (Math.abs(prevSize.width - newWidth) < 20 && Math.abs(prevSize.height - newHeight) < 20) {
+        if (Math.abs(prevSize.width - newWidth) < 10 && Math.abs(prevSize.height - newHeight) < 10) {
           return prevSize;
         }
         return { width: newWidth, height: newHeight };
       });
-    }, 200), // Augmenté de 100ms à 200ms
+    }, 200),
     [propWidth, height, fixedSize, maxWidth, maxHeight]
   );
-  
-  // ✅ OPTIMISATION: Effect simplifié sans ResizeObserver lourd
+
   useEffect(() => {
     if (fixedSize) {
-      const validatedSize = validateDimensions(propWidth, height, 400, maxWidth);
       setCanvasSize({
-        width: Math.min(validatedSize.width, maxWidth),
-        height: Math.min(validatedSize.height, maxHeight)
+        width: Math.min(propWidth, maxWidth),
+        height: Math.min(height, maxHeight)
       });
       return;
     }
-    
+
     const handleResize = () => {
       clearTimeout(resizeTimeoutRef.current);
       resizeTimeoutRef.current = setTimeout(updateCanvasSize, 300);
     };
-    
+
     updateCanvasSize();
     window.addEventListener('resize', handleResize, { passive: true });
-    
+
     return () => {
       clearTimeout(resizeTimeoutRef.current);
       window.removeEventListener('resize', handleResize);
     };
   }, [updateCanvasSize, fixedSize, propWidth, height, maxWidth, maxHeight]);
-  
-  // ✅ OPTIMISATION: Sync avec selectedItem sans effect
+
+  // Sync avec selectedItem
   const effectiveSelectedId = selectedItem?.id || selectedId;
   const effectiveSelectedType = selectedItem?.type || selectedType;
-  
-  // ✅ OPTIMISATION: Handlers mémorisés et simplifiés
+
+  // Handlers
   const checkDeselect = useCallback((e) => {
     if (e.target === e.target.getStage()) {
       setSelectedId(null);
@@ -170,7 +138,7 @@ const Canvas = ({
       onItemSelect?.(null);
     }
   }, [onItemSelect]);
-  
+
   const handleKeyDown = useCallback((e) => {
     if (e.keyCode === 46 && effectiveSelectedId && editable) {
       if (effectiveSelectedType === 'table') {
@@ -185,24 +153,23 @@ const Canvas = ({
       onItemSelect?.(null);
     }
   }, [effectiveSelectedId, effectiveSelectedType, editable, dispatch, onItemSelect]);
-  
+
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // ✅ OPTIMISATION: Handlers de drag simplifiés
   const handleTableDragEnd = useCallback((tableId, newPosition) => {
     if (!editable || !dragMode) return;
-    
+
     dispatch(updateTablePosition({ tableId, position: newPosition }));
     onTableDragEnd?.(tableId, newPosition);
     setSnackbar({ open: true, message: 'Position mise à jour', severity: 'success' });
   }, [editable, dragMode, dispatch, onTableDragEnd]);
-  
+
   const handleObstacleDragEnd = useCallback((obstacleId, newPosition) => {
     if (!editable || !obstaclesDraggable) return;
-    
+
     dispatch(updateObstaclePosition({ obstacleId, position: newPosition }));
     propOnObstacleDragEnd?.(obstacleId, newPosition);
     setSnackbar({ open: true, message: 'Obstacle déplacé', severity: 'success' });
@@ -211,7 +178,7 @@ const Canvas = ({
   const handleItemClick = useCallback((id, type) => {
     setSelectedId(id);
     setSelectedType(type);
-    
+
     if (onItemSelect) {
       const items = type === 'table' ? currentFloorPlan?.tables : currentFloorPlan?.obstacles;
       const item = items?.find(item => item.id === id);
@@ -220,11 +187,11 @@ const Canvas = ({
       }
     }
   }, [onItemSelect, currentFloorPlan]);
-  
-  // ✅ OPTIMISATION: Validation ultra-rapide avec early return
+
+  // ✅ CORRECTION 4: Validation simplifiée des tables
   const safeTables = useMemo(() => {
     if (!currentFloorPlan?.tables?.length) return [];
-    
+
     return currentFloorPlan.tables
       .filter(table => table?.id && table.width > 0 && table.height > 0)
       .map(table => ({
@@ -238,34 +205,54 @@ const Canvas = ({
         rotation: Number(table.rotation) || 0
       }));
   }, [currentFloorPlan?.tables]);
-  
+
+  // ✅ CORRECTION 5: Validation simplifiée des obstacles + debug
   const safeObstacles = useMemo(() => {
-    if (!showObstacles || !currentFloorPlan?.obstacles?.length) return [];
-    
-    return currentFloorPlan.obstacles
-      .filter(obstacle => obstacle?.id && obstacle.width > 0 && obstacle.height > 0)
-      .map(obstacle => ({
-        ...obstacle,
-        x: Number(obstacle.x) || 0,
-        y: Number(obstacle.y) || 0,
-        width: Math.max(Number(obstacle.width) || 10, 10),
-        height: Math.max(Number(obstacle.height) || 10, 10),
-        color: obstacle.color || '#FF6384',
-        rotation: Number(obstacle.rotation) || 0,
-        shape: obstacle.shape || 'rectangle'
-      }));
+    console.log('🔍 Canvas - currentFloorPlan?.obstacles:', currentFloorPlan?.obstacles);
+    console.log('🔍 Canvas - showObstacles:', showObstacles);
+
+    if (!showObstacles || !currentFloorPlan?.obstacles?.length) {
+      console.log('⚠️ Canvas - Pas d\'obstacles à afficher');
+      return [];
+    }
+
+    const filtered = currentFloorPlan.obstacles
+      .filter(obstacle => {
+        const isValid = obstacle?.id && obstacle.width > 0 && obstacle.height > 0;
+        if (!isValid) {
+          console.log('⚠️ Canvas - Obstacle invalide:', obstacle);
+        }
+        return isValid;
+      })
+      .map(obstacle => {
+        const processed = {
+          ...obstacle,
+          x: Number(obstacle.x) || 0,
+          y: Number(obstacle.y) || 0,
+          width: Math.max(Number(obstacle.width) || 10, 10),
+          height: Math.max(Number(obstacle.height) || 10, 10),
+          color: obstacle.color || '#FF6384',
+          rotation: Number(obstacle.rotation) || 0,
+          shape: obstacle.shape || 'rectangle'
+        };
+        console.log('✅ Canvas - Obstacle traité:', processed);
+        return processed;
+      });
+
+    console.log('📊 Canvas - Obstacles finaux:', filtered);
+    return filtered;
   }, [currentFloorPlan?.obstacles, showObstacles]);
-  
+
   const safePerimeter = useMemo(() => {
     if (!showPerimeter || !Array.isArray(currentFloorPlan?.perimeter) || currentFloorPlan.perimeter.length < 3) {
       return [];
     }
-    return currentFloorPlan.perimeter.filter(point => 
+    return currentFloorPlan.perimeter.filter(point =>
       point && typeof point.x === 'number' && typeof point.y === 'number'
     );
   }, [currentFloorPlan?.perimeter, showPerimeter]);
-  
-  // ✅ OPTIMISATION: Rendu conditionnel optimisé
+
+  // Rendu conditionnel pour plan vide
   if (!currentFloorPlan) {
     return (
       <Paper
@@ -284,8 +271,8 @@ const Canvas = ({
         }}
       >
         <Box sx={{ textAlign: 'center', p: 2 }}>
-          <TableRestaurantIcon 
-            sx={{ fontSize: 48, color: theme.palette.text.secondary, mb: 1 }} 
+          <TableRestaurantIcon
+            sx={{ fontSize: 48, color: theme.palette.text.secondary, mb: 1 }}
           />
           <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
             Aucun plan sélectionné
@@ -294,13 +281,13 @@ const Canvas = ({
       </Paper>
     );
   }
-  
+
   const finalCanvasWidth = Math.min(Math.max(canvasSize.width, 400), maxWidth);
   const finalCanvasHeight = Math.min(Math.max(canvasSize.height, 300), maxHeight);
-  
+
   const bgColor = currentFloorPlan?.backgroundColor || (isDark ? '#1E1E1E' : '#f9f9f9');
   const strokeColor = isDark ? '#333333' : '#dddddd';
-  
+
   return (
     <Box sx={{ position: 'relative' }}>
       <Paper
@@ -335,8 +322,10 @@ const Canvas = ({
               strokeWidth={1}
               listening={false}
             />
-            
-            {/* Perimeter - Rendu conditionnel */}
+
+
+
+            {/* Perimeter */}
             {safePerimeter.length >= 3 && (
               <Line
                 points={safePerimeter.flatMap(point => [point.x, point.y])}
@@ -347,50 +336,43 @@ const Canvas = ({
                 listening={false}
               />
             )}
-            
-            {/* Obstacles */}
+
+            {/* ✅ CORRECTION 6: Obstacles avec debug et rendu amélioré */}
             <Group>
               {safeObstacles.map((obstacle) => {
+                console.log('🧪 TEST obstacle:', obstacle.id, obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+
                 const isSelected = effectiveSelectedId === obstacle.id && effectiveSelectedType === 'obstacle';
                 const isDraggable = editable && obstaclesDraggable && dragMode;
-                
+
                 const commonProps = {
                   key: obstacle.id,
-                  fill: obstacle.color,
-                  stroke: isSelected ? theme.palette.primary.main : '#FF6384',
-                  strokeWidth: isSelected ? 3 : 1,
+                  fill: "#00FF00",  // ✅ VERT FLUO pour test
+                  stroke: "#FF0000", // ✅ CONTOUR ROUGE
+                  strokeWidth: 4,    // ✅ CONTOUR ÉPAIS
                   draggable: isDraggable,
                   onClick: () => handleItemClick(obstacle.id, 'obstacle'),
                   onTap: () => handleItemClick(obstacle.id, 'obstacle'),
                 };
-                
-                if (isDraggable) {
-                  commonProps.onDragEnd = (e) => {
-                    const pos = e.target.position();
-                    handleObstacleDragEnd(obstacle.id, pos);
-                  };
-                }
-                
-                return obstacle.shape === 'circle' ? (
-                  <Circle
-                    {...commonProps}
-                    x={obstacle.x}
-                    y={obstacle.y}
-                    radius={Math.max(obstacle.width/2, 5)}
-                  />
-                ) : (
+
+                // ✅ RECTANGLE avec POSITION et TAILLE FORCÉES pour test
+                return (
                   <Rect
                     {...commonProps}
-                    x={obstacle.x - obstacle.width/2}
-                    y={obstacle.y - obstacle.height/2}
-                    width={obstacle.width}
-                    height={obstacle.height}
-                    rotation={obstacle.rotation}
+                    x={50}         // ✅ Position en haut à gauche
+                    y={100}        // ✅ Position visible
+                    width={300}    // ✅ Très large
+                    height={100}   // ✅ Très haut
+                    rotation={0}
+                    // ✅ Force les couleurs
+                    fill="#FF0000"     // Rouge vif
+                    stroke="#000000"   // Contour noir
+                    strokeWidth={5}    // Contour épais
                   />
                 );
               })}
             </Group>
-            
+
             {/* Tables */}
             <Group>
               {safeTables.map((table) => (
@@ -408,7 +390,7 @@ const Canvas = ({
             </Group>
           </Layer>
         </Stage>
-        
+
         {/* Drag Mode Indicator */}
         {dragMode && editable && (
           <Box sx={{ position: 'absolute', bottom: 12, right: 12, zIndex: 10 }}>
@@ -420,8 +402,21 @@ const Canvas = ({
             />
           </Box>
         )}
+
+        {/* ✅ CORRECTION 7: Debug info en développement */}
+        {import.meta.env.NODE_ENV === 'development' && (
+          <Box sx={{ position: 'absolute', top: 12, left: 12, zIndex: 10 }}>
+            <Chip
+              label={`Tables: ${safeTables.length} | Obstacles: ${safeObstacles.length}`}
+              size="small"
+              color="info"
+              variant="outlined"
+              sx={{ backgroundColor: 'rgba(255,255,255,0.9)' }}
+            />
+          </Box>
+        )}
       </Paper>
-      
+
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
@@ -441,13 +436,6 @@ const Canvas = ({
   );
 };
 
-export default React.memo(Canvas, (prevProps, nextProps) => {
-  // Comparaison optimisée pour éviter les re-renders inutiles
-  return (
-    prevProps.editable === nextProps.editable &&
-    prevProps.dragMode === nextProps.dragMode &&
-    prevProps.selectedItem?.id === nextProps.selectedItem?.id &&
-    prevProps.width === nextProps.width &&
-    prevProps.height === nextProps.height
-  );
-});
+// ✅ CORRECTION 8: Suppression de React.memo pour forcer le re-render
+// Le composant se re-render maintenant à chaque changement d'état
+export default Canvas;
